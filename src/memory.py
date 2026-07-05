@@ -48,6 +48,8 @@ class Memory:
     uses: int
     pinned: bool
     salience: float
+    kind: str = "fact"
+    source: str | None = None
 
     @property
     def is_current(self) -> bool:
@@ -69,6 +71,7 @@ class MemoryCore:
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  text TEXT NOT NULL,
                  kind TEXT NOT NULL DEFAULT 'fact',  -- 'fact' (distilled, keyed) | 'raw' (verbatim slice)
+                 source TEXT,                   -- provenance (e.g. session id) for recall eval + demo
                  skey TEXT,                     -- semantic key "subject::attribute" for supersession
                  embedding BLOB NOT NULL,
                  salience REAL NOT NULL DEFAULT 0.5,
@@ -87,12 +90,39 @@ class MemoryCore:
 
     # ---- embedding -------------------------------------------------------
     def _embed(self, text: str) -> np.ndarray:
+        return self.embed_batch([text])[0]
+
+    _EMBED_MAX_CHARS = 6000  # keep well under the model's token cap per input
+
+    def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
+        """Unit-normalised embeddings, batched (DashScope caps input at 10/call).
+        Long inputs are truncated; a failing batch falls back to per-item so one bad
+        row can't abort a bulk ingest."""
         if self._client is None:
             self._client = config.qwen_client()
-        r = self._client.embeddings.create(model=config.QWEN_EMBED_MODEL, input=text)
-        v = np.asarray(r.data[0].embedding, dtype=np.float32)
-        n = np.linalg.norm(v)
-        return v / n if n else v  # unit-normalise -> cosine == dot product
+        clipped = [t[: self._EMBED_MAX_CHARS] for t in texts]
+        out: list[np.ndarray] = []
+        for i in range(0, len(clipped), 10):
+            chunk = clipped[i:i + 10]
+            try:
+                r = self._client.embeddings.create(model=config.QWEN_EMBED_MODEL, input=chunk)
+                vecs = [d.embedding for d in r.data]
+            except Exception:
+                vecs = []
+                for one in chunk:  # isolate the offending row
+                    try:
+                        vecs.append(self._client.embeddings.create(
+                            model=config.QWEN_EMBED_MODEL, input=one).data[0].embedding)
+                    except Exception:
+                        vecs.append(None)
+            for v in vecs:
+                if v is None:
+                    out.append(np.zeros(1024, dtype=np.float32))  # inert placeholder
+                    continue
+                a = np.asarray(v, dtype=np.float32)
+                n = np.linalg.norm(a)
+                out.append(a / n if n else a)
+        return out
 
     # ---- store -----------------------------------------------------------
     def store(
@@ -101,11 +131,13 @@ class MemoryCore:
         *,
         key: str | None = None,
         kind: str = "fact",
+        source: str | None = None,
         pinned: bool = False,
         salience: float = 0.5,
         valid_at: float | None = None,
         supersede: float = 0.90,
         dedup: float = 0.985,
+        _vec: np.ndarray | None = None,
     ) -> int:
         """Add a memory.
 
@@ -120,7 +152,7 @@ class MemoryCore:
         text = text.strip()
         if not text:
             raise ValueError("empty memory")
-        vec = self._embed(text)  # network call — kept outside the lock
+        vec = _vec if _vec is not None else self._embed(text)  # network call — outside the lock
         t = self._now()
         va = valid_at if valid_at is not None else t
         with self._lock:
@@ -156,9 +188,9 @@ class MemoryCore:
                         (va, t, hit[0]),
                     )
             cur = self.db.execute(
-                "INSERT INTO memories(text, kind, skey, embedding, salience, valid_at, created_at, "
-                "last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?)",
-                (text, kind, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
+                "INSERT INTO memories(text, kind, source, skey, embedding, salience, valid_at, "
+                "created_at, last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
             )
             self.db.commit()
             return cur.lastrowid
@@ -193,28 +225,16 @@ class MemoryCore:
 
             # Dual-pool selection: distilled facts win on consistency/temporal, raw
             # slices win on verbatim detail (durations, numbers). Guarantee raw slices
-            # a share of the budget so distillation can't crowd out the exact answer.
-            n_raw_min = k // 2
-            picked, seen = [], set()
-
-            def _take(row, rank):
-                if row["id"] in seen:
-                    return False
-                seen.add(row["id"]); picked.append((rank, row)); return True
-
-            for rank, _rel, row in scored:                # first pass: best overall
-                if len([p for p in picked if p[1]["kind"] != "raw"]) >= k - n_raw_min \
-                        and row["kind"] != "raw":
-                    continue
-                if len(picked) >= k:
-                    break
-                _take(row, rank)
-            if len(picked) < k:                            # backfill raw by relevance
-                for _rank, rel, row in sorted(scored, key=lambda x: x[1], reverse=True):
-                    if len(picked) >= k:
-                        break
-                    if row["kind"] == "raw":
-                        _take(row, rel)
+            # a share of the budget so distillation can't crowd out the exact answer —
+            # but if one pool is empty, the other fills all k slots (no starvation).
+            facts = [(rank, row) for rank, _rel, row in scored if row["kind"] != "raw"]
+            raws = [(rel, row) for _rank, rel, row in scored if row["kind"] == "raw"]
+            n_raw = min(len(raws), k // 2)
+            picked = facts[: k - n_raw] + raws[:n_raw]
+            if len(picked) < k:  # backfill from whatever remains, best rank first
+                leftover = facts[k - n_raw:] + raws[n_raw:]
+                leftover.sort(key=lambda x: x[0], reverse=True)
+                picked += leftover[: k - len(picked)]
 
             out: list[Memory] = []
             used = 0
@@ -294,6 +314,7 @@ class MemoryCore:
             invalid_at=row["invalid_at"], expired_at=row["expired_at"],
             last_access=row["last_access"], uses=row["uses"],
             pinned=bool(row["pinned"]), salience=row["salience"],
+            kind=row["kind"], source=row["source"],
         )
 
     def stats(self) -> dict:
