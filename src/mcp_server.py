@@ -10,17 +10,26 @@ from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from memory import MemoryCore
+from mnemo import Mnemo
 
 mcp = FastMCP("mnemo")
-_core = MemoryCore()
+_mnemo = Mnemo()
+_core = _mnemo.core
+
+
+@mcp.tool()
+def learn(message: str, pinned: bool = False) -> str:
+    """Ingest a raw message/note: automatically distill it into atomic facts, then
+    store each with supersession (a changed fact retires the old value, history kept).
+    This is the main write path — prefer it over `remember` for conversational input."""
+    ids = _mnemo.ingest(message, pinned=pinned)
+    return f"learned {len(ids)} fact(s)" if ids else "no durable fact found"
 
 
 @mcp.tool()
 def remember(text: str, pinned: bool = False) -> str:
-    """Store a memory (a fact, preference, or event) for later recall.
-    Set pinned=true for durable identity facts that must never be forgotten.
-    Near-duplicates are automatically consolidated."""
+    """Store a single pre-formed fact directly (skip distillation).
+    Set pinned=true for durable identity facts that must never be forgotten."""
     mem_id = _core.store(text, pinned=pinned)
     return f"stored (id={mem_id}, pinned={pinned})"
 
@@ -45,14 +54,15 @@ def forget_stale() -> str:
     archived plus current store stats."""
     n = _core.forget_sweep()
     st = _core.stats()
-    return f"archived {n} stale memories · live={st['live']} archived={st['archived']}"
+    return (f"archived {n} stale memories · current={st['current']} "
+            f"superseded={st['superseded']} archived={st['archived']}")
 
 
 @mcp.tool()
 def memory_stats() -> str:
-    """Report how many live vs archived memories are in the store."""
+    """Report the store's current / superseded (history) / archived counts."""
     st = _core.stats()
-    return f"live={st['live']} archived={st['archived']}"
+    return f"current={st['current']} superseded={st['superseded']} archived={st['archived']}"
 
 
 if __name__ == "__main__":

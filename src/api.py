@@ -10,14 +10,20 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from memory import MemoryCore
+from mnemo import Mnemo
 
 app = FastAPI(
     title="Mnemo — Self-Managing Memory API",
-    description="Persistent, self-forgetting memory for LLM agents, powered by Qwen Cloud.",
-    version="0.1.0",
+    description="Persistent, self-forgetting, bi-temporal memory for LLM agents, powered by Qwen Cloud.",
+    version="0.2.0",
 )
-_core = MemoryCore()
+_mnemo = Mnemo()
+_core = _mnemo.core
+
+
+class IngestReq(BaseModel):
+    message: str = Field(..., min_length=1)
+    pinned: bool = False
 
 
 class StoreReq(BaseModel):
@@ -34,6 +40,13 @@ class RecallReq(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok", **_core.stats()}
+
+
+@app.post("/ingest")
+def ingest(req: IngestReq):
+    """Distill a raw message into atomic facts and store them (with supersession)."""
+    ids = _mnemo.ingest(req.message, pinned=req.pinned)
+    return {"stored": len(ids), "ids": ids}
 
 
 @app.post("/memories")

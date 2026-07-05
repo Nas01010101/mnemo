@@ -1,12 +1,19 @@
-"""MemoryCore — self-managing memory for LLM agents (Mnemo, Track 1).
+"""MemoryCore — self-managing, bi-temporal memory for LLM agents (Mnemo, Track 1).
 
 The three Track-1 asks, in one class:
-  • efficient storage & retrieval  -> Qwen embeddings + sqlite + cosine
-  • timely forgetting              -> decay score(recency, uses, pinned) + sweep
+  • efficient storage & retrieval  -> Qwen embeddings + sqlite + cosine (no LLM in read path)
+  • timely forgetting              -> decay score(recency, uses, salience) + sweep
   • recall under limited context   -> budgeted top-k retrieval
 
-Zero heavy deps: sqlite (stdlib) + numpy. Vectors are brute-force cosine — fine at
-hackathon scale (<1e5 memories); swap in sqlite-vec later without touching the API.
+Bi-temporal model (the biggest accuracy lever, per SOTA — see docs/SOTA.md):
+  • valid_at / invalid_at   — when the fact is true *in the world* (event time)
+  • created_at / expired_at — when the system *knew* it (transaction time)
+Supersession INVALIDATES the old fact (sets invalid_at + expired_at) instead of
+overwriting it, so history is preserved: "what did I believe in March" stays answerable
+via recall(as_of=...), while default recall returns only currently-true facts.
+
+Zero heavy deps: sqlite (stdlib) + numpy. Brute-force cosine — fine at hackathon scale
+(<1e5 memories); swap in sqlite-vec later without touching the API.
 """
 from __future__ import annotations
 
@@ -32,11 +39,21 @@ _FORGET_THRESHOLD = 0.15      # decay score below this -> archived by the sweep
 class Memory:
     id: int
     text: str
-    score: float          # live decay score at query time
-    created_at: float
+    score: float          # relevance × decay at query time
+    created_at: float     # transaction time: when learned
+    valid_at: float       # event time: when true in the world
+    invalid_at: float | None
+    expired_at: float | None
     last_access: float
     uses: int
     pinned: bool
+    salience: float
+    kind: str = "fact"
+    source: str | None = None
+
+    @property
+    def is_current(self) -> bool:
+        return self.expired_at is None
 
 
 class MemoryCore:
@@ -53,8 +70,15 @@ class MemoryCore:
             """CREATE TABLE IF NOT EXISTS memories (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
                  text TEXT NOT NULL,
+                 kind TEXT NOT NULL DEFAULT 'fact',  -- 'fact' (distilled, keyed) | 'raw' (verbatim slice)
+                 source TEXT,                   -- provenance (e.g. session id) for recall eval + demo
+                 skey TEXT,                     -- semantic key "subject::attribute" for supersession
                  embedding BLOB NOT NULL,
-                 created_at REAL NOT NULL,
+                 salience REAL NOT NULL DEFAULT 0.5,
+                 valid_at REAL NOT NULL,        -- event time (true from)
+                 invalid_at REAL,               -- event time (true until); NULL = still true
+                 created_at REAL NOT NULL,      -- transaction time (learned at)
+                 expired_at REAL,               -- transaction time (retired at); NULL = current
                  last_access REAL NOT NULL,
                  uses INTEGER NOT NULL DEFAULT 0,
                  pinned INTEGER NOT NULL DEFAULT 0,
@@ -66,51 +90,129 @@ class MemoryCore:
 
     # ---- embedding -------------------------------------------------------
     def _embed(self, text: str) -> np.ndarray:
+        return self.embed_batch([text])[0]
+
+    _EMBED_MAX_CHARS = 6000  # keep well under the model's token cap per input
+
+    def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
+        """Unit-normalised embeddings, batched (DashScope caps input at 10/call).
+        Long inputs are truncated; a failing batch falls back to per-item so one bad
+        row can't abort a bulk ingest."""
         if self._client is None:
             self._client = config.qwen_client()
-        r = self._client.embeddings.create(model=config.QWEN_EMBED_MODEL, input=text)
-        v = np.asarray(r.data[0].embedding, dtype=np.float32)
-        n = np.linalg.norm(v)
-        return v / n if n else v  # unit-normalise -> cosine == dot product
+        clipped = [t[: self._EMBED_MAX_CHARS] for t in texts]
+        out: list[np.ndarray] = []
+        for i in range(0, len(clipped), 10):
+            chunk = clipped[i:i + 10]
+            try:
+                r = self._client.embeddings.create(model=config.QWEN_EMBED_MODEL, input=chunk)
+                vecs = [d.embedding for d in r.data]
+            except Exception:
+                vecs = []
+                for one in chunk:  # isolate the offending row
+                    try:
+                        vecs.append(self._client.embeddings.create(
+                            model=config.QWEN_EMBED_MODEL, input=one).data[0].embedding)
+                    except Exception:
+                        vecs.append(None)
+            for v in vecs:
+                if v is None:
+                    out.append(np.zeros(1024, dtype=np.float32))  # inert placeholder
+                    continue
+                a = np.asarray(v, dtype=np.float32)
+                n = np.linalg.norm(a)
+                out.append(a / n if n else a)
+        return out
 
     # ---- store -----------------------------------------------------------
-    def store(self, text: str, *, pinned: bool = False, dedup: float = 0.93) -> int:
-        """Add a memory. If a near-duplicate exists (cosine >= dedup), refresh it
-        instead of inserting — cheap write-time consolidation."""
+    def store(
+        self,
+        text: str,
+        *,
+        key: str | None = None,
+        kind: str = "fact",
+        source: str | None = None,
+        pinned: bool = False,
+        salience: float = 0.5,
+        valid_at: float | None = None,
+        supersede: float = 0.90,
+        dedup: float = 0.985,
+        _vec: np.ndarray | None = None,
+    ) -> int:
+        """Add a memory.
+
+        Supersession — how the old fact is retired (bi-temporal, history preserved):
+        - If `key` (a "subject::attribute" semantic key from the distiller) is given,
+          any current memory with the SAME key and DIFFERENT text is superseded. This
+          is the reliable path: it catches value changes (14:20→09:45) and rephrasings
+          that embedding similarity alone cannot separate from restatements.
+        - Without a key, fall back to embedding proximity: >= dedup ⇒ restatement
+          (refresh); supersede..dedup with differing text ⇒ supersede. Best-effort only.
+        """
         text = text.strip()
         if not text:
             raise ValueError("empty memory")
-        vec = self._embed(text)  # network call — kept outside the lock
+        vec = _vec if _vec is not None else self._embed(text)  # network call — outside the lock
+        t = self._now()
+        va = valid_at if valid_at is not None else t
         with self._lock:
-            if dedup:
-                hit = self._nearest(vec)
-                if hit and hit[1] >= dedup:
-                    # Near-duplicate: the NEWER fact supersedes the old one (e.g. a
-                    # changed flight time). Overwrite text + embedding in place so
-                    # the stale value retires without a conflicting duplicate.
+            if kind == "raw":
+                pass  # raw slices never supersede each other; just insert
+            elif key is not None:
+                prior = self.db.execute(
+                    "SELECT id, text, pinned, salience FROM memories "
+                    "WHERE skey=? AND archived=0 AND expired_at IS NULL",
+                    (key,),
+                ).fetchall()
+                for row in prior:
+                    if row["text"] == text:
+                        self._touch(row["id"])
+                        return row["id"]          # exact restatement of a keyed fact
+                for row in prior:                 # same key, new value ⇒ supersede all priors
+                    # A pinned/high-salience fact-slot keeps those properties across
+                    # value updates (pinning "residence" survives a move).
+                    pinned = pinned or bool(row["pinned"])
+                    salience = max(salience, row["salience"])
                     self.db.execute(
-                        "UPDATE memories SET text=?, embedding=?, last_access=?, uses=uses+1 WHERE id=?",
-                        (text, vec.tobytes(), self._now(), hit[0]),
+                        "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                        (va, t, row["id"]),
                     )
-                    self.db.commit()
+            else:
+                hit = self._nearest_current(vec)  # (id, sim, text)
+                if hit and hit[1] >= dedup:
+                    self._touch(hit[0])
                     return hit[0]
-            t = self._now()
+                if hit and hit[1] >= supersede and hit[2] != text:
+                    self.db.execute(
+                        "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                        (va, t, hit[0]),
+                    )
             cur = self.db.execute(
-                "INSERT INTO memories(text, embedding, created_at, last_access, pinned) "
-                "VALUES (?,?,?,?,?)",
-                (text, vec.tobytes(), t, t, int(pinned)),
+                "INSERT INTO memories(text, kind, source, skey, embedding, salience, valid_at, "
+                "created_at, last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
             )
             self.db.commit()
             return cur.lastrowid
 
     # ---- recall ----------------------------------------------------------
-    def recall(self, query: str, *, k: int = 5, char_budget: int | None = None) -> list[Memory]:
-        """Return the most relevant *live* memories, ranked by relevance × decay.
-        If char_budget is set, greedily fill up to that many characters (recall
-        under a limited context window)."""
+    def recall(
+        self,
+        query: str,
+        *,
+        k: int = 5,
+        char_budget: int | None = None,
+        as_of: float | None = None,
+    ) -> list[Memory]:
+        """Most relevant memories, ranked by relevance × decay.
+
+        Default: only *currently-true* facts (expired_at IS NULL). Pass as_of=<ts>
+        to time-travel — recall what was believed true at that timestamp.
+        char_budget greedily caps total size (recall under a limited context window).
+        """
         qv = self._embed(query)  # network call — kept outside the lock
         with self._lock:
-            rows = self._live_rows()
+            rows = self._rows_as_of(as_of)
             if not rows:
                 return []
             scored = []
@@ -121,34 +223,49 @@ class MemoryCore:
                 scored.append((rank, relevance, row))
             scored.sort(key=lambda x: x[0], reverse=True)
 
+            # Dual-pool selection: distilled facts win on consistency/temporal, raw
+            # slices win on verbatim detail (durations, numbers). Guarantee raw slices
+            # a share of the budget so distillation can't crowd out the exact answer —
+            # but if one pool is empty, the other fills all k slots (no starvation).
+            facts = [(rank, row) for rank, _rel, row in scored if row["kind"] != "raw"]
+            raws = [(rel, row) for _rank, rel, row in scored if row["kind"] == "raw"]
+            n_raw = min(len(raws), k // 2)
+            picked = facts[: k - n_raw] + raws[:n_raw]
+            if len(picked) < k:  # backfill from whatever remains, best rank first
+                leftover = facts[k - n_raw:] + raws[n_raw:]
+                leftover.sort(key=lambda x: x[0], reverse=True)
+                picked += leftover[: k - len(picked)]
+
             out: list[Memory] = []
             used = 0
-            for rank, _rel, row in scored:
-                if len(out) >= k:
-                    break
+            for rank, row in sorted(picked, key=lambda x: x[0], reverse=True):
                 if char_budget is not None and used + len(row["text"]) > char_budget and out:
-                    continue  # skip ones that don't fit, keep filling with smaller ones
-                self._touch(row["id"])
+                    continue
+                if as_of is None:
+                    self._touch(row["id"])
                 used += len(row["text"])
                 out.append(self._to_memory(row, rank))
             return out
 
     # ---- forgetting ------------------------------------------------------
     def _decay(self, row) -> float:
-        """Score in (0,1]. Pinned never decays. Otherwise recency half-life plus a
-        mild boost for frequently-accessed memories."""
+        """Score in (0,1]. Pinned never decays. Recency half-life, boosted by how
+        often the memory is used and by its salience."""
         if row["pinned"]:
             return 1.0
         age = self._now() - row["last_access"]
         recency = math.pow(0.5, age / _HALFLIFE_S)
         use_boost = 1.0 + math.log1p(row["uses"]) * 0.15
-        return min(1.0, recency * use_boost)
+        sal_boost = 0.6 + 0.8 * row["salience"]           # 0.6..1.4
+        return min(1.0, recency * use_boost * sal_boost)
 
     def forget_sweep(self) -> int:
-        """Archive memories whose decay score fell below threshold. Returns count."""
+        """Archive current memories whose decay score fell below threshold
+        (pinned never forgotten). Superseded/expired facts are left in place as
+        history but excluded from current recall. Returns count archived."""
         n = 0
         with self._lock:
-            for row in self._live_rows():
+            for row in self._current_rows():
                 if not row["pinned"] and self._decay(row) < _FORGET_THRESHOLD:
                     self.db.execute("UPDATE memories SET archived=1 WHERE id=?", (row["id"],))
                     n += 1
@@ -156,16 +273,31 @@ class MemoryCore:
         return n
 
     # ---- helpers ---------------------------------------------------------
-    def _live_rows(self):
-        return self.db.execute("SELECT * FROM memories WHERE archived=0").fetchall()
+    def _current_rows(self):
+        """Live, currently-true memories (not archived, not superseded)."""
+        return self.db.execute(
+            "SELECT * FROM memories WHERE archived=0 AND expired_at IS NULL"
+        ).fetchall()
 
-    def _nearest(self, vec: np.ndarray):
+    def _rows_as_of(self, as_of: float | None):
+        if as_of is None:
+            return self._current_rows()
+        # time-travel: facts the system knew (created_at<=t) and hadn't retired
+        # (expired_at IS NULL OR expired_at>t), that were true in the world then.
+        return self.db.execute(
+            "SELECT * FROM memories WHERE archived=0 AND created_at<=? "
+            "AND (expired_at IS NULL OR expired_at>?) "
+            "AND valid_at<=? AND (invalid_at IS NULL OR invalid_at>?)",
+            (as_of, as_of, as_of, as_of),
+        ).fetchall()
+
+    def _nearest_current(self, vec: np.ndarray):
         best = None
-        for row in self._live_rows():
+        for row in self._current_rows():
             emb = np.frombuffer(row["embedding"], dtype=np.float32)
             sim = float(np.dot(vec, emb))
             if best is None or sim > best[1]:
-                best = (row["id"], sim)
+                best = (row["id"], sim, row["text"])
         return best
 
     def _touch(self, mem_id: int):
@@ -178,14 +310,26 @@ class MemoryCore:
     def _to_memory(self, row, score: float) -> Memory:
         return Memory(
             id=row["id"], text=row["text"], score=round(score, 4),
-            created_at=row["created_at"], last_access=row["last_access"],
-            uses=row["uses"], pinned=bool(row["pinned"]),
+            created_at=row["created_at"], valid_at=row["valid_at"],
+            invalid_at=row["invalid_at"], expired_at=row["expired_at"],
+            last_access=row["last_access"], uses=row["uses"],
+            pinned=bool(row["pinned"]), salience=row["salience"],
+            kind=row["kind"], source=row["source"],
         )
 
     def stats(self) -> dict:
-        live = self.db.execute("SELECT COUNT(*) c FROM memories WHERE archived=0").fetchone()["c"]
-        arch = self.db.execute("SELECT COUNT(*) c FROM memories WHERE archived=1").fetchone()["c"]
-        return {"live": live, "archived": arch}
+        c = self.db.execute(
+            "SELECT "
+            "SUM(CASE WHEN archived=0 AND expired_at IS NULL THEN 1 ELSE 0 END) current, "
+            "SUM(CASE WHEN expired_at IS NOT NULL THEN 1 ELSE 0 END) superseded, "
+            "SUM(CASE WHEN archived=1 THEN 1 ELSE 0 END) archived "
+            "FROM memories"
+        ).fetchone()
+        return {
+            "current": c["current"] or 0,
+            "superseded": c["superseded"] or 0,
+            "archived": c["archived"] or 0,
+        }
 
     def close(self):
         self.db.close()
