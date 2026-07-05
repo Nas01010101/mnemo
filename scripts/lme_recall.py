@@ -39,7 +39,44 @@ def recall_hit(sources, evidence):
     return any(s in evidence for s in sources)
 
 
-def eval_instance(inst, k, embedder):
+ANSWER_MODEL = config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus")
+_qa_client = None
+_qa_usage = {"in": 0, "out": 0}
+
+
+def _qa_chat(system, user, max_tokens=256):
+    global _qa_client
+    if _qa_client is None:
+        _qa_client = config.qwen_client()
+    r = _qa_client.chat.completions.create(
+        model=ANSWER_MODEL,
+        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
+        temperature=0, max_tokens=max_tokens, extra_body={"enable_thinking": False},
+    )
+    _qa_usage["in"] += r.usage.prompt_tokens
+    _qa_usage["out"] += r.usage.completion_tokens
+    return (r.choices[0].message.content or "").strip()
+
+
+_ANS_SYS = ("Answer the question using ONLY the provided memory about the user. Reason over "
+            "the notes, then give a short direct answer. If absent, say 'I don't know'. "
+            "End with 'ANSWER: <answer>'.")
+_JUDGE_SYS = ("Grade whether the model answer matches the gold answer for the question. Be "
+              "lenient about phrasing; judge semantic correctness. Reply exactly 'yes' or 'no'.")
+
+
+def qa_answer(context, question, qdate):
+    out = _qa_chat(_ANS_SYS, f"Question date: {qdate}\n\nMemory:\n{context}\n\nQuestion: {question}")
+    return out.split("ANSWER:")[-1].strip() if "ANSWER:" in out else out
+
+
+def qa_judge(question, gold, pred):
+    return _qa_chat(_JUDGE_SYS,
+                    f"Question: {question}\nGold: {gold}\nModel answer: {pred}\nCorrect?",
+                    max_tokens=4).lower().startswith("y")
+
+
+def eval_instance(inst, k, embedder, qa=False):
     evidence = set(inst["answer_session_ids"])
     turns = flatten(inst)
     texts = [t for _, t in turns]
@@ -55,6 +92,7 @@ def eval_instance(inst, k, embedder):
     top = np.argsort(-sims)[:k]
     rag_lat = time.time() - t0
     rag_ok = recall_hit([sids[i] for i in top], evidence)
+    rag_ctx = "\n".join(texts[i] for i in sorted(top))
 
     # --- mnemo: hybrid ingest (facts + raw), dual-pool recall ---
     db = Path(tempfile.mkdtemp()) / "r.db"
@@ -85,8 +123,19 @@ def eval_instance(inst, k, embedder):
     hits = m.core.recall(inst["question"], k=k)
     mnemo_lat = time.time() - t0
     mnemo_ok = recall_hit([h.source for h in hits], evidence)
+    mnemo_ctx = "\n".join(f"- {h.text}" for h in hits)
     m.close()
-    return inst["question_type"], rag_ok, mnemo_ok, rag_lat, mnemo_lat, len(texts)
+
+    r = {"type": inst["question_type"], "rag_recall": rag_ok, "mnemo_recall": mnemo_ok,
+         "rag_lat": rag_lat, "mnemo_lat": mnemo_lat, "turns": len(texts),
+         "full_ctx_chars": sum(len(t) for t in texts),
+         "rag_ctx_chars": len(rag_ctx), "mnemo_ctx_chars": len(mnemo_ctx)}
+    if qa:
+        rp = qa_answer(rag_ctx, inst["question"], inst["question_date"])
+        mp = qa_answer(mnemo_ctx, inst["question"], inst["question_date"])
+        r["rag_qa"] = qa_judge(inst["question"], inst["answer"], rp)
+        r["mnemo_qa"] = qa_judge(inst["question"], inst["answer"], mp)
+    return r
 
 
 def main():
@@ -94,36 +143,55 @@ def main():
     ap.add_argument("--limit", type=int, default=30)
     ap.add_argument("--k", type=int, default=10)
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--qa", action="store_true", help="also run answer-accuracy + context efficiency")
+    ap.add_argument("--type", default="", help="filter to one question_type (e.g. knowledge-update)")
     args = ap.parse_args()
 
     import random
     data = [d for d in json.load(open(DATA)) if not d["question_id"].endswith("_abs")]
+    if args.type:
+        data = [d for d in data if d["question_type"] == args.type]
     random.Random(args.seed).shuffle(data)
     data = data[:args.limit]
 
     core = Mnemo(Path(tempfile.mkdtemp()) / "emb.db")  # embedder host
     embedder = core.core.embed_batch
 
-    agg = {"rag": [0, []], "mnemo": [0, []]}
-    by_type = {}
+    rows = []
     t_start = time.time()
     for i, inst in enumerate(data):
-        qt, rok, mok, rl, ml, nt = eval_instance(inst, args.k, embedder)
-        agg["rag"][0] += rok; agg["rag"][1].append(rl)
-        agg["mnemo"][0] += mok; agg["mnemo"][1].append(ml)
-        bt = by_type.setdefault(qt, [0, 0, 0]); bt[0] += rok; bt[1] += mok; bt[2] += 1
-        print(f"[{i+1}/{len(data)}] {qt[:18]:18s} turns={nt:4d} | rag:{'✓' if rok else '✗'} mnemo:{'✓' if mok else '✗'}")
+        r = eval_instance(inst, args.k, embedder, qa=args.qa)
+        rows.append(r)
+        tail = ""
+        if args.qa:
+            tail = f" | QA rag:{'✓' if r['rag_qa'] else '✗'} mnemo:{'✓' if r['mnemo_qa'] else '✗'}"
+        print(f"[{i+1}/{len(data)}] {r['type'][:18]:18s} turns={r['turns']:4d} | "
+              f"recall rag:{'✓' if r['rag_recall'] else '✗'} mnemo:{'✓' if r['mnemo_recall'] else '✗'}{tail}")
 
-    n = len(data)
-    print(f"\n=== session-level recall@{args.k} on LongMemEval_S (n={n}) ===")
-    for name in ("rag", "mnemo"):
-        c, lats = agg[name]
-        med = sorted(lats)[len(lats) // 2] * 1000 if lats else 0
-        print(f"{name:6s}  recall@{args.k}={100*c/n:5.1f}%  ({c}/{n})  retrieval_med={med:5.0f}ms")
-    print("\nby question type (rag / mnemo):")
-    for qt, (r, mm, tot) in sorted(by_type.items()):
-        print(f"  {qt:24s} {100*r/tot:5.1f}% / {100*mm/tot:5.1f}%  (n={tot})")
-    print(f"\nwall={time.time()-t_start:.0f}s")
+    n = len(rows)
+    def pct(key): return 100 * sum(r[key] for r in rows) / n
+    print(f"\n=== LongMemEval_S (n={n}{', type='+args.type if args.type else ''}) ===")
+    print(f"session-level recall@{args.k}:  rag={pct('rag_recall'):.1f}%  mnemo={pct('mnemo_recall'):.1f}%")
+    if args.qa:
+        print(f"answer accuracy (QA):       rag={pct('rag_qa'):.1f}%  mnemo={pct('mnemo_qa'):.1f}%")
+    avg = lambda key: sum(r[key] for r in rows) / n
+    print(f"context chars fed to reader: full≈{avg('full_ctx_chars'):.0f}  "
+          f"rag≈{avg('rag_ctx_chars'):.0f}  mnemo≈{avg('mnemo_ctx_chars'):.0f}")
+    print(f"  → mnemo uses {100*(1-avg('mnemo_ctx_chars')/avg('full_ctx_chars')):.1f}% less context than full history")
+    # per-type
+    print("\nby type (recall rag/mnemo" + (" · QA rag/mnemo" if args.qa else "") + "):")
+    types = {}
+    for r in rows:
+        types.setdefault(r["type"], []).append(r)
+    for qt, rs in sorted(types.items()):
+        t = len(rs)
+        line = f"  {qt:24s} {100*sum(x['rag_recall'] for x in rs)/t:5.1f}%/{100*sum(x['mnemo_recall'] for x in rs)/t:5.1f}%"
+        if args.qa:
+            line += f"  ·  {100*sum(x['rag_qa'] for x in rs)/t:5.1f}%/{100*sum(x['mnemo_qa'] for x in rs)/t:5.1f}%"
+        print(line + f"  (n={t})")
+    if args.qa:
+        print(f"\nQA tokens: in={_qa_usage['in']:,} out={_qa_usage['out']:,}")
+    print(f"wall={time.time()-t_start:.0f}s")
 
 
 if __name__ == "__main__":
