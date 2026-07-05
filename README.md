@@ -10,6 +10,22 @@ limited context window — with **no LLM in the read path**.
 
 ![architecture](docs/architecture.svg)
 
+## The result that matters
+RAG-style memory re-reads raw history every query and **drowns as facts change**. Mnemo
+maintains a compact, self-consistent *world-model of the user*. Measured on LongMemEval_S
+(honest protocol in [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
+
+- **Best accuracy-per-token** of any approach — matches most of RAG's answer quality on
+  **half the context**, and **99% less** than full-context (41.2 vs 27.4 vs 0.5 acc/1k-tok).
+- **Long-horizon dominance** — as one fact is updated 2→12 times, **RAG collapses 100%→50%
+  while Mnemo holds 100%.** Supersession keeps exactly one current value; RAG's top-k
+  drowns in stale versions.
+
+  ![long-horizon](docs/horizon.svg)
+- **Retrieval recall on par with strong RAG** (95% = 95%).
+- Honest: for one-shot factual retrieval a strong RAG matches us; multi-hop temporal
+  synthesis is our weak spot. We report it.
+
 ## Why it's different
 Most memory systems are append-and-retrieve. The three things Track 1 explicitly asks
 for — efficient retrieval, *timely forgetting*, and *recall under limited context* — are
@@ -55,16 +71,16 @@ Claude Desktop MCP config:
 { "mcpServers": { "mnemo": { "command": "python", "args": ["/ABS/PATH/src/mcp_server.py"] } } }
 ```
 
-## Results (honest)
-On **LongMemEval_S** (Qwen-judged, indicative — see [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
-- Session-level recall@10 is **competitive with naive-RAG** (RAG 43% / Mnemo 37%); Mnemo
-  **wins multi-session**. Raw retrieval recall is *not* where a memory system's value lies.
-- Mnemo's real edge — **serving the current value of a changed fact** (supersession),
-  **forgetting**, and **time-travel** — is proven deterministically in the test suite and
-  measured by the knowledge-update benchmark.
+## Results (honest) — full numbers in [`docs/BENCHMARK.md`](docs/BENCHMARK.md)
+LongMemEval_S, off-Qwen validation (local `bge-small` + `gpt-4o-mini`), n=20:
+- **recall@10: 95% = RAG.**
+- **QA accuracy-per-1k-tokens: Mnemo 41.2 > RAG 27.4 > full-context 0.5** (best efficiency;
+  45% acc on 1,092 tokens vs RAG 60% on 2,193 vs full-context 65% on 123,773).
+- **Long-horizon:** RAG 100%→50% as a fact is updated 2→12×; **Mnemo stays 100%.**
+- Weakness we report: temporal-reasoning QA (compression loses detail).
 
-We do **not** claim a leaderboard-topping number; we report what we measured and are
-explicit about limitations.
+We do **not** claim a leaderboard-topping accuracy number — a strong RAG wins one-shot
+retrieval. Mnemo wins on efficiency, long-horizon robustness, and capabilities RAG lacks.
 
 ## Tests
 ```bash

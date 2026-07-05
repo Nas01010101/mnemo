@@ -126,6 +126,10 @@ def eval_instance(inst, k, embedder, qa=False):
         mp = qa_answer(mnemo_ctx, inst["question"], inst["question_date"])
         r["rag_qa"] = qa_judge(inst["question"], inst["answer"], rp)
         r["mnemo_qa"] = qa_judge(inst["question"], inst["answer"], mp)
+        # full-context ceiling: feed the entire history to the reader
+        full_ctx = "\n".join(f"[{d}] {t}" for d, t in turns)
+        fp = qa_answer(full_ctx, inst["question"], inst["question_date"])
+        r["full_qa"] = qa_judge(inst["question"], inst["answer"], fp)
     return r
 
 
@@ -163,10 +167,18 @@ def main():
     def pct(key): return 100 * sum(r[key] for r in rows) / n
     print(f"\n=== LongMemEval_S (n={n}{', type='+args.type if args.type else ''}) ===")
     print(f"session-level recall@{args.k}:  rag={pct('rag_recall'):.1f}%  mnemo={pct('mnemo_recall'):.1f}%")
-    if args.qa:
-        print(f"answer accuracy (QA):       rag={pct('rag_qa'):.1f}%  mnemo={pct('mnemo_qa'):.1f}%")
     avg = lambda key: sum(r[key] for r in rows) / n
-    print(f"context chars fed to reader: full≈{avg('full_ctx_chars'):.0f}  "
+    if args.qa:
+        print(f"\nanswer accuracy (QA):  full-context={pct('full_qa'):.1f}%  "
+              f"rag@{args.k}={pct('rag_qa'):.1f}%  mnemo={pct('mnemo_qa'):.1f}%")
+        # the frontier: accuracy per unit of reader context (tokens ≈ chars/4)
+        for name, acc_k, ctx_k in [("full-context", "full_qa", "full_ctx_chars"),
+                                   ("rag", "rag_qa", "rag_ctx_chars"),
+                                   ("mnemo", "mnemo_qa", "mnemo_ctx_chars")]:
+            toks = avg(ctx_k) / 4
+            print(f"  {name:13s} acc={pct(acc_k):5.1f}%  ctx≈{toks:6.0f} tok  "
+                  f"acc/1k-tok={pct(acc_k)/max(toks/1000,1e-6):6.1f}")
+    print(f"\ncontext chars fed to reader: full≈{avg('full_ctx_chars'):.0f}  "
           f"rag≈{avg('rag_ctx_chars'):.0f}  mnemo≈{avg('mnemo_ctx_chars'):.0f}")
     print(f"  → mnemo uses {100*(1-avg('mnemo_ctx_chars')/avg('full_ctx_chars')):.1f}% less context than full history")
     # per-type

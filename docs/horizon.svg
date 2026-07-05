@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="360" viewBox="0 0 560 360" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif">
+  <text x="30" y="30" font-size="17" font-weight="700" fill="#111827">Long-horizon knowledge churn: current-value accuracy</text>
+  <text x="30" y="50" font-size="12" fill="#6b7280">One fact updated N times amid distractors (k=6, 12 principals/point). RAG drowns in stale versions; Mnemo supersedes.</text>
+
+  <!-- axes -->
+  <line x1="60" y1="80" x2="60" y2="290" stroke="#9ca3af" stroke-width="1.5"/>
+  <line x1="60" y1="290" x2="500" y2="290" stroke="#9ca3af" stroke-width="1.5"/>
+  <!-- y gridlines + labels -->
+  <line x1="60" y1="90"  x2="500" y2="90"  stroke="#eee" stroke-width="1"/>
+  <line x1="60" y1="170" x2="500" y2="170" stroke="#eee" stroke-width="1"/>
+  <line x1="60" y1="250" x2="500" y2="250" stroke="#eee" stroke-width="1"/>
+  <text x="52" y="94"  font-size="11" fill="#6b7280" text-anchor="end">100%</text>
+  <text x="52" y="174" font-size="11" fill="#6b7280" text-anchor="end">67%</text>
+  <text x="52" y="254" font-size="11" fill="#6b7280" text-anchor="end">33%</text>
+  <!-- x labels -->
+  <text x="60"  y="308" font-size="11" fill="#6b7280" text-anchor="middle">2</text>
+  <text x="148" y="308" font-size="11" fill="#6b7280" text-anchor="middle">4</text>
+  <text x="236" y="308" font-size="11" fill="#6b7280" text-anchor="middle">6</text>
+  <text x="324" y="308" font-size="11" fill="#6b7280" text-anchor="middle">8</text>
+  <text x="412" y="308" font-size="11" fill="#6b7280" text-anchor="middle">10</text>
+  <text x="500" y="308" font-size="11" fill="#6b7280" text-anchor="middle">12</text>
+  <text x="280" y="335" font-size="12" fill="#374151" text-anchor="middle">number of times the fact was updated</text>
+
+  <!-- Mnemo: flat at 100% (y=90) -->
+  <polyline fill="none" stroke="#10b981" stroke-width="3"
+    points="60,90 148,90 236,90 324,90 412,90 500,90"/>
+  <!-- RAG: 100,100,100,67,58,50  (y: 90,90,90,170,192,210) -->
+  <polyline fill="none" stroke="#ef4444" stroke-width="3"
+    points="60,92 148,92 236,92 324,170 412,192 500,210"/>
+  <g fill="#ef4444"><circle cx="324" cy="170" r="3.5"/><circle cx="412" cy="192" r="3.5"/><circle cx="500" cy="210" r="3.5"/></g>
+  <g fill="#10b981"><circle cx="324" cy="90" r="3.5"/><circle cx="412" cy="90" r="3.5"/><circle cx="500" cy="90" r="3.5"/></g>
+
+  <!-- legend -->
+  <rect x="360" y="230" width="14" height="3" fill="#10b981"/>
+  <text x="380" y="236" font-size="12" fill="#111827">Mnemo — 100% (holds)</text>
+  <rect x="360" y="252" width="14" height="3" fill="#ef4444"/>
+  <text x="380" y="258" font-size="12" fill="#111827">naive-RAG — 100%→50%</text>
+</svg>

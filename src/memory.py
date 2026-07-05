@@ -33,6 +33,7 @@ _DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "mnemo.db"
 # Forgetting knobs
 _HALFLIFE_S = 14 * 24 * 3600  # a memory's recency weight halves every 14 days
 _FORGET_THRESHOLD = 0.15      # decay score below this -> archived by the sweep
+_STALE_ECHO = 0.80            # a raw slice this similar to a superseded fact is stale
 
 
 @dataclass
@@ -113,6 +114,7 @@ class MemoryCore:
         valid_at: float | None = None,
         supersede: float = 0.90,
         dedup: float = 0.985,
+        surprise_gate: float | None = None,
         _vec: np.ndarray | None = None,
     ) -> int:
         """Add a memory.
@@ -133,7 +135,17 @@ class MemoryCore:
         va = valid_at if valid_at is not None else t
         with self._lock:
             if kind == "raw":
-                pass  # raw slices never supersede each other; just insert
+                # World-model efficiency (predictive-coding principle): only store a raw
+                # observation the memory does NOT already predict. If it's near-identical
+                # to an existing raw slice (cosine >= surprise_gate), it carries no new
+                # information — skip it. Shrinks the store without losing novel detail.
+                if surprise_gate is not None:
+                    for r in self.db.execute(
+                        "SELECT embedding FROM memories WHERE kind='raw' AND archived=0 "
+                        "AND expired_at IS NULL"
+                    ).fetchall():
+                        if float(np.dot(vec, np.frombuffer(r["embedding"], dtype=np.float32))) >= surprise_gate:
+                            return -1  # redundant observation, not stored
             elif key is not None:
                 prior = self.db.execute(
                     "SELECT id, text, pinned, salience FROM memories "
@@ -205,6 +217,20 @@ class MemoryCore:
             # but if one pool is empty, the other fills all k slots (no starvation).
             facts = [(rank, row) for rank, _rel, row in scored if row["kind"] != "raw"]
             raws = [(rel, row) for _rank, rel, row in scored if row["kind"] == "raw"]
+
+            # World-model consistency: the current facts are the belief state. A raw
+            # slice that echoes a SUPERSEDED belief (e.g. "I moved to Boston" after the
+            # user moved on) is stale evidence — retire it from current recall so it
+            # can't reintroduce an outdated value. (Only for current recall, not as_of.)
+            if as_of is None and raws:
+                expired = self._expired_fact_matrix()
+                if expired is not None:
+                    kept = []
+                    for rel, row in raws:
+                        emb = np.frombuffer(row["embedding"], dtype=np.float32)
+                        if float(np.max(expired @ emb)) < _STALE_ECHO:
+                            kept.append((rel, row))
+                    raws = kept
             n_raw = min(len(raws), k // 2)
             picked = facts[: k - n_raw] + raws[:n_raw]
             if len(picked) < k:  # backfill from whatever remains, best rank first
@@ -266,6 +292,17 @@ class MemoryCore:
             "AND valid_at<=? AND (invalid_at IS NULL OR invalid_at>?)",
             (as_of, as_of, as_of, as_of),
         ).fetchall()
+
+    def _expired_fact_matrix(self):
+        """Embeddings of superseded (expired) facts — the retired belief values.
+        Returns an (M×d) matrix or None."""
+        rows = self.db.execute(
+            "SELECT embedding FROM memories WHERE kind='fact' AND expired_at IS NOT NULL "
+            "AND archived=0"
+        ).fetchall()
+        if not rows:
+            return None
+        return np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
 
     def _nearest_current(self, vec: np.ndarray):
         best = None

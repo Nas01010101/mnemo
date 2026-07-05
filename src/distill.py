@@ -22,6 +22,9 @@ Return STRICT JSON: {"facts": [{"statement","key","salience","valid_at"}...]}.
 
 Rules:
 - statement: one self-contained fact. Resolve pronouns to names. No fluff.
+  PRESERVE specific values VERBATIM — numbers, dates, times, durations, quantities,
+  prices, proper nouns (e.g. keep "2 days", "March 3 at 14:20", "$50", "gate B12").
+  Never generalize a specific away; those exact details are what gets asked about.
 - key: a stable "subject::attribute" slug (lowercase, snake_case), e.g.
   "user::residence", "user::coffee_pref", "project_nimbus::ship_date". The SAME
   real-world attribute must always get the SAME key so later updates supersede it.

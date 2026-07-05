@@ -92,20 +92,31 @@ def chat(messages, *, qwen_default: str, max_tokens: int = 512, temperature: flo
     agy (Gemini CLI, off-Claude-plan)."""
     if LLM_PROVIDER == "agy":
         return _agy_chat(messages)
+    import time as _t
     kw = {"model": chat_model(qwen_default), "messages": messages,
           "temperature": temperature, "max_tokens": max_tokens}
     if LLM_PROVIDER == "qwen":
         kw["extra_body"] = {"enable_thinking": False}
-    if json_mode:
-        kw["response_format"] = {"type": "json_object"}
+        if json_mode:  # Qwen supports it reliably; OpenRouter provider support varies,
+            kw["response_format"] = {"type": "json_object"}  # so we rely on the prompt there
     client = chat_client()
-    r = client.chat.completions.create(**kw)
-    if not r.choices:  # some providers/models reject response_format -> retry plain
-        kw.pop("response_format", None)
-        r = client.chat.completions.create(**kw)
-    if not r.choices:
-        return ""
-    return (r.choices[0].message.content or "").strip()
+    for attempt in range(5):
+        try:
+            r = client.chat.completions.create(**kw)
+            if r.choices:
+                return (r.choices[0].message.content or "").strip()
+            kw.pop("response_format", None)  # empty -> drop json constraint, retry
+        except Exception as e:  # noqa: BLE001
+            msg = str(e)
+            if "response_format" in msg or "json_object" in msg:
+                kw.pop("response_format", None)  # provider rejects json mode
+            elif "429" in msg or "rate" in msg.lower() or "temporarily" in msg.lower():
+                _t.sleep(2 * (attempt + 1))      # transient rate limit — back off
+            elif attempt >= 3:
+                return ""
+            else:
+                _t.sleep(1)
+    return ""
 
 
 def _agy_chat(messages) -> str:

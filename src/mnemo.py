@@ -35,7 +35,8 @@ class Mnemo:
         return ids
 
     def ingest_session(self, turns, *, source: str | None = None,
-                       valid_at: float | None = None, pinned: bool = False) -> dict:
+                       valid_at: float | None = None, pinned: bool = False,
+                       surprise_gate: float | None = 0.97) -> dict:
         """Hybrid ingest of a conversation session (list of {role,content} or (role,content)).
 
         Stores BOTH:
@@ -57,11 +58,14 @@ class Mnemo:
         for role, content in norm:
             if not content.strip():
                 continue
-            # raw slices: retrievable, lower salience, never supersede each other
-            raw_ids.append(self.core.store(
+            # raw slices: retrievable, lower salience, never supersede each other;
+            # surprise-gated so redundant observations aren't stored.
+            rid = self.core.store(
                 f"{role}: {content.strip()}", kind="raw", salience=0.35,
-                source=source, valid_at=valid_at,
-            ))
+                source=source, valid_at=valid_at, surprise_gate=surprise_gate,
+            )
+            if rid != -1:
+                raw_ids.append(rid)
         return {"facts": fact_ids, "raw": raw_ids}
 
     def store_fact(self, text: str, **kw) -> int:

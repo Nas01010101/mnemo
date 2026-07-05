@@ -71,8 +71,9 @@ def build_history(seed_offset):
         gold[attr] = (vv[-1], vv[:-1])
         for i, v in enumerate(vv):
             events.append((i, f"User: {UPDATE_TMPL[attr].format(v=v)}"))
-    # spread distractors across the timeline
-    dpool = list(DISTRACTORS)
+    # spread distractors across the timeline, with some verbatim repeats (users
+    # repeat themselves) so surprise-gating has redundant observations to drop
+    dpool = list(DISTRACTORS) + list(DISTRACTORS[:4])  # 4 exact repeats
     rng.shuffle(dpool)
     for j, d in enumerate(dpool):
         events.append((0.5 + j * 0.3, f"User: {d}"))
@@ -111,8 +112,9 @@ def run_principal(seed_offset, k):
     # Mnemo: ingest each session (distill+supersede) in chronological order
     clock = [1_000_000.0]
     m2 = Mnemo(Path(tempfile.mkdtemp()) / "ku2.db", now=lambda: clock[0])
+    raw_kept = 0
     for s in sessions:
-        m2.ingest_session(s, valid_at=clock[0]); clock[0] += 3600
+        raw_kept += len(m2.ingest_session(s, valid_at=clock[0])["raw"]); clock[0] += 3600
 
     rows = []
     for attr, (q, _vals) in ATTRS.items():
@@ -128,9 +130,12 @@ def run_principal(seed_offset, k):
         mem_ans = answer(mem_ctx, q)
         r_ok, r_leak = score(rag_ans, latest, stale)
         m_ok, m_leak = score(mem_ans, latest, stale)
-        rows.append((attr, latest, rag_ans, mem_ans, r_ok, r_leak, m_ok, m_leak))
+        rows.append((attr, latest, rag_ans, mem_ans, r_ok, r_leak, m_ok, m_leak,
+                     len(rag_ctx), len(mem_ctx)))
+    stored = {"turns": len(turns), "raw_stored": raw_kept,
+              "full_hist_chars": sum(len(t) for t in rag_texts)}
     m.close(); m2.close()
-    return rows
+    return rows, stored
 
 
 def main():
@@ -140,21 +145,34 @@ def main():
     args = ap.parse_args()
 
     all_rows = []
+    stores = []
     t0 = time.time()
     for p in range(args.principals):
-        rows = run_principal(p, args.k)
+        rows, stored = run_principal(p, args.k)
+        stores.append(stored)
         for r in rows:
             all_rows.append(r)
-            attr, latest, ra, ma, rok, rleak, mok, mleak = r
+            attr, latest, ra, ma, rok, rleak, mok, mleak, rcl, mcl = r
             print(f"[p{p}] {attr:10s} latest={latest:14s} | "
                   f"RAG={'✓' if rok else '✗'}{'⚠leak' if rleak else '':5s} '{ra[:22]}' | "
                   f"MNEMO={'✓' if mok else '✗'}{'⚠leak' if mleak else '':5s} '{ma[:22]}'")
 
     n = len(all_rows)
     def rate(idx): return 100 * sum(r[idx] for r in all_rows) / n
+    avg = lambda idx: sum(r[idx] for r in all_rows) / n
     print(f"\n=== knowledge-update: current-value accuracy (n={n}, k={args.k}) ===")
     print(f"RAG    current-correct={rate(4):5.1f}%   stale-leak={rate(5):5.1f}%")
     print(f"MNEMO  current-correct={rate(6):5.1f}%   stale-leak={rate(7):5.1f}%")
+    # efficiency (the world-model win): compact belief-state recall vs raw dump
+    full_chars = sum(s["full_hist_chars"] for s in stores) / len(stores)
+    print(f"\n=== efficiency ===")
+    print(f"context chars fed to reader:  full-history≈{full_chars:.0f}  "
+          f"RAG≈{avg(8):.0f}  MNEMO≈{avg(9):.0f}")
+    print(f"  → MNEMO reads {100*(1-avg(9)/avg(8)):.0f}% less context than RAG, "
+          f"{100*(1-avg(9)/full_chars):.0f}% less than full history")
+    turns = sum(s["turns"] for s in stores); stored = sum(s["raw_stored"] for s in stores)
+    print(f"surprise-gated storage: {stored} memories kept from {turns} turns "
+          f"({100*(1-stored/turns):.0f}% of raw observations dropped as redundant)")
     print(f"\ntokens in/out: {_usage['in']:,}/{_usage['out']:,}  wall={time.time()-t0:.0f}s")
 
 

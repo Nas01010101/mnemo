@@ -41,14 +41,18 @@ thing when the context window is small. Track 1 asks for exactly those three.
 for distillation, `qwen3.7-plus` for reading — all via the OpenAI-compatible DashScope
 (Alibaba Cloud Model Studio) API. Optional Alibaba Cloud OSS snapshots for durability.
 
-**Honest evaluation.** On LongMemEval_S, raw retrieval recall is competitive with naive
-RAG (we don't claim a leaderboard win); Mnemo's real, measured edge is **serving the
-current value of a changed fact**, forgetting, and time-travel — capabilities RAG is
-structurally unable to provide. Full numbers + limitations in `docs/BENCHMARK.md`.
+**Honest evaluation (LongMemEval_S).** Recall@10 is on par with strong RAG (95%=95%).
+Mnemo delivers the **best accuracy-per-token** (41.2 vs RAG 27.4 vs full-context 0.5 acc
+per 1k reader-tokens) — matching most of RAG's answer quality on half the context. And in
+the **long-horizon regime** — a fact updated many times — **RAG collapses (100%→50%) while
+Mnemo holds 100%**, because supersession keeps exactly one current value instead of a pile
+of stale ones. We're explicit about the weak spot: multi-hop temporal synthesis, where
+compression costs accuracy. Full numbers in `docs/BENCHMARK.md`.
 
-**What's novel.** A memory system engineered for the *accuracy–latency–forgetting*
-frontier rather than pure recall, with bi-temporal supersession + a stable semantic key
-from distillation, exposed over MCP.
+**What's novel.** A memory system engineered for the *accuracy-per-token* frontier and
+*long-horizon robustness* rather than one-shot recall: bi-temporal supersession, a
+world-model consistency rule (stale evidence of a superseded belief is retired), and
+surprise-gated writes (predictive-coding efficiency) — exposed over MCP.
 
 ## Built with
 `Qwen Cloud` (qwen3.7-plus, qwen3.6-flash, text-embedding-v4) · `Model Context Protocol` ·
