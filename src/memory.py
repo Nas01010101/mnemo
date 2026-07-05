@@ -95,34 +95,10 @@ class MemoryCore:
     _EMBED_MAX_CHARS = 6000  # keep well under the model's token cap per input
 
     def embed_batch(self, texts: list[str]) -> list[np.ndarray]:
-        """Unit-normalised embeddings, batched (DashScope caps input at 10/call).
-        Long inputs are truncated; a failing batch falls back to per-item so one bad
-        row can't abort a bulk ingest."""
-        if self._client is None:
-            self._client = config.qwen_client()
-        clipped = [t[: self._EMBED_MAX_CHARS] for t in texts]
-        out: list[np.ndarray] = []
-        for i in range(0, len(clipped), 10):
-            chunk = clipped[i:i + 10]
-            try:
-                r = self._client.embeddings.create(model=config.QWEN_EMBED_MODEL, input=chunk)
-                vecs = [d.embedding for d in r.data]
-            except Exception:
-                vecs = []
-                for one in chunk:  # isolate the offending row
-                    try:
-                        vecs.append(self._client.embeddings.create(
-                            model=config.QWEN_EMBED_MODEL, input=one).data[0].embedding)
-                    except Exception:
-                        vecs.append(None)
-            for v in vecs:
-                if v is None:
-                    out.append(np.zeros(1024, dtype=np.float32))  # inert placeholder
-                    continue
-                a = np.asarray(v, dtype=np.float32)
-                n = np.linalg.norm(a)
-                out.append(a / n if n else a)
-        return out
+        """Unit-normalised embeddings via the active provider (Qwen Cloud by default,
+        or a local model when EMBED_PROVIDER=local). Batching/truncation/fallback are
+        handled in config.embed_texts."""
+        return config.embed_texts(texts)
 
     # ---- store -----------------------------------------------------------
     def store(

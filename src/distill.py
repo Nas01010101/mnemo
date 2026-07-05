@@ -46,17 +46,10 @@ class Fact:
 
 
 def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
-    client = client or config.qwen_client()
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[{"role": "system", "content": _SYS},
-                  {"role": "user", "content": text}],
-        response_format={"type": "json_object"},
-        temperature=0,
-        max_tokens=800,
-        extra_body={"enable_thinking": False},  # extraction needs no reasoning trace; faster + cheaper
-    )
-    raw = resp.choices[0].message.content or "{}"
+    raw = config.chat(
+        [{"role": "system", "content": _SYS}, {"role": "user", "content": text}],
+        qwen_default=model, max_tokens=800, temperature=0, json_mode=True,
+    ) or "{}"
     try:
         data = json.loads(raw)
     except json.JSONDecodeError:

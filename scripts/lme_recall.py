@@ -40,22 +40,13 @@ def recall_hit(sources, evidence):
 
 
 ANSWER_MODEL = config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus")
-_qa_client = None
 _qa_usage = {"in": 0, "out": 0}
 
 
 def _qa_chat(system, user, max_tokens=256):
-    global _qa_client
-    if _qa_client is None:
-        _qa_client = config.qwen_client()
-    r = _qa_client.chat.completions.create(
-        model=ANSWER_MODEL,
-        messages=[{"role": "system", "content": system}, {"role": "user", "content": user}],
-        temperature=0, max_tokens=max_tokens, extra_body={"enable_thinking": False},
-    )
-    _qa_usage["in"] += r.usage.prompt_tokens
-    _qa_usage["out"] += r.usage.completion_tokens
-    return (r.choices[0].message.content or "").strip()
+    return config.chat([{"role": "system", "content": system},
+                        {"role": "user", "content": user}],
+                       qwen_default=ANSWER_MODEL, max_tokens=max_tokens)
 
 
 _ANS_SYS = ("Answer the question using ONLY the provided memory about the user. Reason over "

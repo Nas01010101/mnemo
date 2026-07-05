@@ -24,7 +24,6 @@ import numpy as np  # noqa: E402
 import config       # noqa: E402
 from mnemo import Mnemo  # noqa: E402
 
-_client = config.qwen_client()
 _usage = {"in": 0, "out": 0}
 
 # attribute -> (question, [chronological values, oldest..newest])
@@ -84,16 +83,12 @@ def build_history(seed_offset):
 
 
 def answer(context, question):
-    r = _client.chat.completions.create(
-        model=config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus"),
-        messages=[{"role": "system", "content":
-                   "Answer using ONLY the memory provided. Give the user's CURRENT value. "
-                   "Reply with just the value, nothing else."},
-                  {"role": "user", "content": f"Memory:\n{context}\n\nQuestion: {question}"}],
-        temperature=0, max_tokens=32, extra_body={"enable_thinking": False},
-    )
-    _usage["in"] += r.usage.prompt_tokens; _usage["out"] += r.usage.completion_tokens
-    return (r.choices[0].message.content or "").strip()
+    return config.chat(
+        [{"role": "system", "content":
+          "Answer using ONLY the memory provided. Give the user's CURRENT value. "
+          "Reply with just the value, nothing else."},
+         {"role": "user", "content": f"Memory:\n{context}\n\nQuestion: {question}"}],
+        qwen_default=config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus"), max_tokens=32)
 
 
 def score(ans, latest, stale):

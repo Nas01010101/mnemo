@@ -4,3 +4,5 @@ fastapi>=0.110
 uvicorn>=0.27
 mcp>=1.2
 oss2>=2.18          # Alibaba Cloud Object Storage (memory snapshots / proof-of-deploy)
+# Optional — only for off-Qwen validation (EMBED_PROVIDER=local):
+# sentence-transformers>=3.0
