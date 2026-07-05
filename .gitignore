@@ -1,0 +1,33 @@
+# ---- Secrets: NEVER commit ----
+.env
+.env.*
+!.env.example
+secrets/
+*.key
+*.pem
+*.p12
+credentials.json
+client_secret*.json
+token.json
+*.credentials
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+*.egg-info/
+# ---- Node ----
+node_modules/
+# ---- OS / editor ----
+.DS_Store
+.idea/
+.vscode/
+# ---- Build / artifacts ----
+dist/
+build/
+*.log
+recordings/
+# ---- Local data (memory store) ----
+data/
+*.db
