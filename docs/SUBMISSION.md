@@ -11,14 +11,20 @@ Copy-paste ready. Fill the two bracketed links after you push the repo + upload 
 **Mnemo — self-managing bi-temporal memory for AI agents**
 
 ## Elevator pitch (≤ 200 chars)
-Persistent memory that stores, supersedes, forgets, and recalls under a context budget —
-bi-temporal, no LLM in the read path, on Qwen Cloud, exposed over MCP + HTTP.
+A personal AI assistant on Qwen Cloud whose memory stays true as your life changes — it
+supersedes facts, time-travels to what you used to say, and forgets stale trivia.
 
 ## Text description
-**The problem.** LLM agents forget everything between sessions, and the memory layers
-bolted on top mostly *append and retrieve* — they don't handle the hard parts: a fact
-that **changes** over time, **forgetting** what's gone stale, and **recalling** the right
-thing when the context window is small. Track 1 asks for exactly those three.
+**Mnemo is a personal AI assistant** (`src/agent.py`) that remembers you across sessions
+and — unlike a chatbot bolted onto RAG — **stays correct when your facts change**. Move
+cities, change jobs, update a preference, and it tracks the *current* truth; ask what you
+used to say and it recalls the history; it forgets stale trivia on its own. It's powered
+by **Mnemo**, a memory engine built for the parts append-and-retrieve systems get wrong.
+
+**The problem.** LLM agents forget between sessions, and memory layers bolted on top mostly
+*append and retrieve* — they don't handle a fact that **changes** over time, **forgetting**
+what's gone stale, or **recalling** under a small context window. Track 1 asks for exactly
+those three.
 
 **Mnemo** is a memory service built around them:
 - **Bi-temporal model** — every fact carries *event time* (`valid_at`/`invalid_at`) and

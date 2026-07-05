@@ -1,12 +1,27 @@
-# Mnemo — self-managing memory for AI agents
+# Mnemo — a personal AI assistant whose memory stays true as your life changes
 
-**A bi-temporal, self-forgetting memory service on Qwen Cloud, exposed over MCP + HTTP.**
 Built for the [Global AI Hackathon with Qwen Cloud](https://qwencloud-hackathon.devpost.com) —
 **Track 1: MemoryAgent**.
 
-Give any LLM client persistent memory that **stores** what matters, **supersedes** facts
-when they change, **forgets** what goes stale, and **recalls** the right thing under a
-limited context window — with **no LLM in the read path**.
+**The agent** ([`src/agent.py`](src/agent.py)): a warm personal assistant, powered by Qwen
+Cloud, that remembers you across sessions — and, unlike a chatbot bolted onto RAG, **stays
+correct when your facts change**. Tell it you moved cities or changed jobs and it updates;
+ask what you *used* to say and it time-travels; it forgets stale trivia on its own.
+
+**The engine** ([`src/mnemo.py`](src/mnemo.py)): a bi-temporal, self-forgetting memory that
+**stores** what matters, **supersedes** facts when they change, **forgets** what goes
+stale, and **recalls** under a context budget — **no LLM in the read path** — exposed over
+MCP + HTTP so any agent can use it.
+
+```
+you › Hi! I'm Wissem, I live in Montreal and work as a data analyst.
+assistant › Hi Wissem! Montreal's a great city. How's the analyst work going?   [remembered 2 facts]
+… three weeks later …
+you › Big news — I moved to Toronto and got promoted to senior analyst!
+you › Where do I live and what's my job now?
+assistant › You live in Toronto and you're a senior analyst. Congrats on the promotion!
+```
+Run it: `python src/agent.py` · or the scripted story: `python scripts/demo_agent.py`
 
 ![architecture](docs/architecture.svg)
 
@@ -96,9 +111,14 @@ proof; `src/alicloud_oss.py` (OSS snapshots) is an optional stronger proof. Full
 
 ## Layout
 ```
-src/  config.py memory.py distill.py mnemo.py mcp_server.py api.py alicloud_oss.py
-scripts/  smoke_test.py test_memory.py test_mnemo_e2e.py lme_recall.py bench_knowledge_update.py
-docs/  DESIGN.md SOTA.md BENCHMARK.md DEPLOY.md COMPETITION.md architecture.svg
+src/  agent.py  ← the assistant
+      mnemo.py memory.py distill.py config.py  ← the memory engine
+      mcp_server.py api.py alicloud_oss.py     ← surfaces + deploy
+scripts/  demo_agent.py  ← the video walkthrough
+          test_memory.py test_mnemo_e2e.py smoke_test.py
+          lme_recall.py bench_knowledge_update.py bench_horizon.py  ← benchmarks
+docs/  DESIGN.md SOTA.md BENCHMARK.md COMPARISON.md DEPLOY.md COMPETITION.md
+       architecture.svg horizon.svg
 ```
 
 ## License

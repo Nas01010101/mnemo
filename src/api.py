@@ -20,6 +20,14 @@ app = FastAPI(
 _mnemo = Mnemo()
 _core = _mnemo.core
 
+from agent import MemoryAgent  # noqa: E402
+_agent = MemoryAgent()
+_agent.m = _mnemo  # the assistant shares the one memory store
+
+
+class ChatReq(BaseModel):
+    message: str = Field(..., min_length=1)
+
 
 class IngestReq(BaseModel):
     message: str = Field(..., min_length=1)
@@ -40,6 +48,13 @@ class RecallReq(BaseModel):
 @app.get("/health")
 def health():
     return {"status": "ok", **_core.stats()}
+
+
+@app.post("/chat")
+def chat(req: ChatReq):
+    """The Mnemo Assistant: recall relevant memory → answer with Qwen → learn from the
+    message (with supersession). A persistent, self-managing memory agent over HTTP."""
+    return _agent.respond(req.message)
 
 
 @app.post("/ingest")
