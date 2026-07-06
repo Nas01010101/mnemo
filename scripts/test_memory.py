@@ -17,10 +17,10 @@ def main() -> int:
     fails = []
 
     # --- store + semantic recall (keyed facts, as the distiller emits them) ---
-    core.store("Wissem lives in Montreal.", key="wissem::residence", pinned=True)
-    core.store("Wissem prefers dark roast coffee, no sugar.", key="wissem::coffee_pref")
+    core.store("Alex lives in Montreal.", key="alex::residence", pinned=True)
+    core.store("Alex prefers dark roast coffee, no sugar.", key="alex::coffee_pref")
     core.store("The Q3 budget review is scheduled for October 14.", key="q3_review::date")
-    core.store("Wissem is allergic to shellfish.", key="wissem::allergy")
+    core.store("Alex is allergic to shellfish.", key="alex::allergy")
 
     hits = core.recall("What does he like to drink?", k=2)
     top = hits[0].text if hits else ""
@@ -31,7 +31,7 @@ def main() -> int:
     # --- bi-temporal supersession via semantic key -----------------------
     t_before_move = now()
     clock["t"] += 30 * 24 * 3600  # a month later he moves
-    core.store("Wissem lives in Toronto.", key="wissem::residence")  # same key, new value
+    core.store("Alex lives in Toronto.", key="alex::residence")  # same key, new value
     cur = [m.text for m in core.recall("where does he live?", k=3)]
     print(f"[supersede] current top -> {cur[0] if cur else None!r}")
     if not any("Toronto" in t for t in cur[:1]):
@@ -49,7 +49,7 @@ def main() -> int:
         fails.append("time-travel: as_of did not return the historical belief")
 
     # --- context budget ---------------------------------------------------
-    budgeted = core.recall("tell me about Wissem", k=5, char_budget=60)
+    budgeted = core.recall("tell me about Alex", k=5, char_budget=60)
     used = sum(len(m.text) for m in budgeted)
     print(f"[budget] {len(budgeted)} memories, {used} chars (<=~60 + 1 overflow ok)")
 
@@ -59,9 +59,9 @@ def main() -> int:
     st = core.stats()
     print(f"[forget] swept {archived}; current={st['current']} superseded={st['superseded']} archived={st['archived']}")
     survivors = [m.text for m in core.recall("who is he", k=10)]
-    if not any("Wissem" in s and ("Montreal" in s or "Toronto" in s) for s in survivors):
+    if not any("Alex" in s and ("Montreal" in s or "Toronto" in s) for s in survivors):
         # pinned identity fact mentions Montreal; must survive
-        if not any("Wissem" in s for s in survivors):
+        if not any("Alex" in s for s in survivors):
             fails.append("pinned identity memory was incorrectly forgotten")
     if archived == 0:
         fails.append("forgetting swept nothing after 120 days")

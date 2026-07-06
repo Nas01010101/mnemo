@@ -22,14 +22,14 @@ def now(): return clock["t"]
 
 # (fact, question, gold-substring)
 FACTS = [
-    ("Wissem's flight to Tokyo departs at 14:20 on March 3.", "When does my flight leave?", "14:20"),
+    ("Alex's flight to Tokyo departs at 14:20 on March 3.", "When does my flight leave?", "14:20"),
     ("The office wifi password is blufin-2026.", "What's the wifi password?", "blufin-2026"),
-    ("Wissem's manager is Dr. Adeel Khan.", "Who is my manager?", "Adeel"),
+    ("Alex's manager is Dr. Adeel Khan.", "Who is my manager?", "Adeel"),
     ("The prod database is hosted in the ap-southeast-1 region.", "Where is the prod DB?", "ap-southeast-1"),
-    ("Wissem is vegetarian and dislikes cilantro.", "What are my dietary restrictions?", "vegetarian"),
+    ("Alex is vegetarian and dislikes cilantro.", "What are my dietary restrictions?", "vegetarian"),
     ("The API rate limit for the free tier is 60 requests per minute.", "What's the free-tier rate limit?", "60"),
     ("Project Nimbus ships on the last Friday of Q3.", "When does Project Nimbus ship?", "Q3"),
-    ("Wissem's preferred IDE is Neovim with the tokyonight theme.", "Which editor do I use?", "Neovim"),
+    ("Alex's preferred IDE is Neovim with the tokyonight theme.", "Which editor do I use?", "Neovim"),
 ]
 
 # distractor noise interleaved between the real facts (simulates a long history)
@@ -90,7 +90,7 @@ def main() -> int:
     print(f"context saved vs full history: {saved:.1f}%  (avg {avg_retrieved:.0f} vs {total_hist_chars} chars)")
 
     # supersession: update a fact, confirm the new value wins
-    core.store("UPDATE: Wissem's flight to Tokyo now departs at 09:45 on March 3.", pinned=False)
+    core.store("UPDATE: Alex's flight to Tokyo now departs at 09:45 on March 3.", pinned=False)
     top = core.recall("When does my flight leave?", k=2)
     new_wins = any("09:45" in m.text for m in top[:1])
     print(f"supersession (updated fact ranks first): {'PASS' if new_wins else 'FAIL'}")

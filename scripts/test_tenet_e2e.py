@@ -18,7 +18,7 @@ def main() -> int:
 
     # Session 1
     for msg in [
-        "Hi, I'm Wissem. I live in Montreal and I'm vegetarian. Nice weather today!",
+        "Hi, I'm Alex. I live in Montreal and I'm vegetarian. Nice weather today!",
         "My manager is Dr. Adeel Khan.",
     ]:
         m.ingest(msg); clock["t"] += 3600

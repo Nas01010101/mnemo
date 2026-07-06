@@ -30,7 +30,7 @@ def main():
     print("=" * 70)
     print("  SESSION 1 — getting to know you")
     print("=" * 70)
-    say(agent, "Hi! I'm Wissem. I live in Montreal and I work as a data analyst.")
+    say(agent, "Hi! I'm Alex. I live in Montreal and I work as a data analyst.")
     say(agent, "I'm vegetarian, and I really love dark roast coffee.")
     say(agent, "What do you know about me so far?")
 

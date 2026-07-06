@@ -64,8 +64,8 @@ Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
 
 Tenet ships as a personal assistant ([`src/agent.py`](src/agent.py)) on Qwen Cloud:
 ```
-you › Hi! I'm Wissem, I live in Montreal and work as a data analyst.
-assistant › Nice to meet you, Wissem! How's the analyst work in Montreal?   [remembered 2 facts]
+you › Hi! I'm Alex, I live in Montreal and work as a data analyst.
+assistant › Nice to meet you, Alex! How's the analyst work in Montreal?   [remembered 2 facts]
 … weeks later …
 you › I moved to Toronto and got promoted to senior analyst!
 you › Where do I live and what's my job now?

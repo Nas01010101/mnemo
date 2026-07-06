@@ -11,7 +11,7 @@ not just "it stores text". Record screen + voice; upload public to YouTube.
 **0:20 – 0:50 — Supersession (the money shot)**
 Terminal, run the e2e test or a live snippet:
 ```python
-m.ingest("Hi, I'm Wissem, I live in Montreal and I'm vegetarian.")
+m.ingest("Hi, I'm Alex, I live in Montreal and I'm vegetarian.")
 m.ingest("Update: I moved to Toronto. Also my manager is now Sarah Chen.")
 m.recall("where does the user live and who manages them?")
 ```
