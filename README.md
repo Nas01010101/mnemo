@@ -1,104 +1,127 @@
-# Mnemo — self-managing memory for AI agents
+<div align="center">
 
-**A bi-temporal, self-forgetting memory service on Qwen Cloud, exposed over MCP + HTTP.**
-Built for the [Global AI Hackathon with Qwen Cloud](https://qwencloud-hackathon.devpost.com) —
-**Track 1: MemoryAgent**.
+# Tenet
 
-Give any LLM client persistent memory that **stores** what matters, **supersedes** facts
-when they change, **forgets** what goes stale, and **recalls** the right thing under a
-limited context window — with **no LLM in the read path**.
+### Agent Memory as a Self-Consistent World Model
 
-![architecture](docs/architecture.svg)
+[![paper](https://img.shields.io/badge/paper-Tenet-b31b1b.svg)](paper/tenet.md)
+[![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Qwen Cloud](https://img.shields.io/badge/built%20on-Qwen%20Cloud-6a5acd.svg)](https://qwencloud-hackathon.devpost.com)
+[![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](#)
 
-## The result that matters
-RAG-style memory re-reads raw history every query and **drowns as facts change**. Mnemo
-maintains a compact, self-consistent *world-model of the user*. Measured on LongMemEval_S
-(honest protocol in [`docs/BENCHMARK.md`](docs/BENCHMARK.md)):
+*A memory that stays true as the world changes.* Built for the
+[Global AI Hackathon with Qwen Cloud](https://qwencloud-hackathon.devpost.com) — **Track 1**.
 
-- **Best accuracy-per-token** of any approach — matches most of RAG's answer quality on
-  **half the context**, and **99% less** than full-context (41.2 vs 27.4 vs 0.5 acc/1k-tok).
-- **Long-horizon dominance** — as one fact is updated 2→12 times, **RAG collapses 100%→50%
-  while Mnemo holds 100%.** Supersession keeps exactly one current value; RAG's top-k
-  drowns in stale versions.
+</div>
 
-  ![long-horizon](docs/horizon.svg)
-- **Retrieval recall on par with strong RAG** (95% = 95%).
-- Honest: for one-shot factual retrieval a strong RAG matches us; multi-hop temporal
-  synthesis is our weak spot. We report it.
+---
+
+LLM-agent memory is almost always **retrieval over a log of past turns**. That's the wrong
+abstraction for an agent modeling a *changing* world: as a fact is updated over a long
+interaction — **knowledge churn** — stale versions crowd the retrieval budget and the agent
+answers with an out-of-date value. **Tenet** reframes memory as a **self-consistent belief
+state** — a compact *world model of the user* — and stays correct where retrieval collapses.
+
+<div align="center">
+
+![knowledge churn](docs/horizon.svg)
+
+**As a fact is updated 2→12 times, RAG-memory falls 100%→50%. Tenet holds 100%.**
+
+</div>
 
 ## Why it's different
-Most memory systems are append-and-retrieve. The three things Track 1 explicitly asks
-for — efficient retrieval, *timely forgetting*, and *recall under limited context* — are
-exactly what append-only systems don't do. Mnemo is built around them:
 
-| Capability | How |
-|---|---|
-| **Bi-temporal supersession** | facts carry event time (`valid_at`/`invalid_at`) **and** transaction time (`created_at`/`expired_at`); a changed fact **retires** the old value instead of overwriting it |
-| **Time-travel** | `recall(as_of=…)` answers "what did I believe last March" from retained history |
-| **Timely forgetting** | salience-weighted recency decay; a background sweep archives stale, low-value memories (pinned facts never forgotten) |
-| **Recall under a budget** | `recall(char_budget=N)` fills to a token budget — recall under a limited context window |
-| **Write-time distillation** | raw messages → atomic facts with a stable `subject::attribute` key so updates reliably supersede |
-| **Hybrid index** | distilled facts (consistency/temporal) **+** raw slices (verbatim detail), dual-pool recall |
-| **MCP-native** | plug persistent memory into Claude Desktop / any MCP client (`learn` · `recall` · `forget_stale` · `stats`) |
+| | retrieval memory (RAG) | **Tenet** |
+|---|---|---|
+| abstraction | document index of turns | **belief state (world model)** |
+| a changed fact | two similar passages | **superseded** (bi-temporal, history kept) |
+| stale evidence | retrieved forever | **retired** (belief–evidence consistency) |
+| write policy | store everything | **surprise-gated** (predictive coding) |
+| forgetting | none (grows forever) | salience-decay sweep |
+| queryable across time | no | **time-travel** (`recall(as_of=t)`) |
+| read path | — | **no LLM call** |
 
-The read path uses pure vector + decay scoring — **no LLM call** — so retrieval is fast
-and the memory is frontier-correct on the accuracy/latency axis (LongMemEval-V2's direction).
+Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
 
-## Architecture
-Two surfaces (MCP server + FastAPI) over one `MemoryCore`, backed by Qwen Cloud
-(Alibaba Cloud Model Studio) for distillation + embeddings, with optional Alibaba Cloud
-OSS snapshots for durability. See [`docs/architecture.svg`](docs/architecture.svg) and
-[`docs/DESIGN.md`](docs/DESIGN.md).
+## Results (LongMemEval_S, n=40, gpt-4o reader — honest, reproducible; detail in [`docs/BENCHMARK.md`](docs/BENCHMARK.md))
+
+| | recall@10 | QA acc | reader tokens | **acc / 1k tok** |
+|---|---:|---:|---:|---:|
+| full-context | — | 65% | ~124,000 | 0.5 |
+| RAG | 95% | **65%** | 2,101 | 30.9 |
+| **Tenet** | **97.5%** | 52.5% | **1,067** | **49.2** ← best |
+
+- **Best accuracy-per-token** (1.6× RAG; half its context) — and **reader-robust**: with a
+  frontier reader (`claude-opus-4.8`) it's 1.7× (Tenet 53.9 vs RAG 32.1).
+- **Churn-robust:** 100% at every update level while RAG collapses to 50% — and the collapse
+  holds under a gpt-4o reader, so it's *structural*, not reader weakness.
+- **Ablation:** the belief–evidence consistency rule alone lifts current-value accuracy 55%→100%.
+- **Honest:** a strong RAG wins raw one-shot accuracy (65 vs 52.5); Tenet's weak spot is
+  multi-session synthesis. We report it. *(Eval off-Qwen; shipped system uses Qwen Cloud.)*
+
+## The agent
+
+Tenet ships as a personal assistant ([`src/agent.py`](src/agent.py)) on Qwen Cloud:
+```
+you › Hi! I'm Wissem, I live in Montreal and work as a data analyst.
+assistant › Nice to meet you, Wissem! How's the analyst work in Montreal?   [remembered 2 facts]
+… weeks later …
+you › I moved to Toronto and got promoted to senior analyst!
+you › Where do I live and what's my job now?
+assistant › You live in Toronto and you're a senior analyst. Congrats on the promotion!
+```
+```bash
+python src/agent.py            # interactive assistant
+python scripts/demo_agent.py   # the scripted story (video walkthrough)
+```
 
 ## Quickstart
 ```bash
-cp .env.example .env && chmod 600 .env     # add your DASHSCOPE_API_KEY
+cp .env.example .env && chmod 600 .env      # add DASHSCOPE_API_KEY (Qwen Cloud)
 pip install -r requirements.txt
-python scripts/smoke_test.py               # verify Qwen Cloud connectivity
-
-# use it
-python -c "import sys; sys.path.insert(0,'src'); from mnemo import Mnemo; \
-  m=Mnemo(); m.ingest('I moved to Toronto last week.'); \
-  print([x.text for x in m.recall('where does the user live?')])"
-
-# run the HTTP API
-cd src && uvicorn api:app --host 0.0.0.0 --port 8000
-# or the MCP server
-python src/mcp_server.py
-```
-Claude Desktop MCP config:
-```json
-{ "mcpServers": { "mnemo": { "command": "python", "args": ["/ABS/PATH/src/mcp_server.py"] } } }
+python scripts/smoke_test.py                # verify connectivity
+uvicorn api:app --host 0.0.0.0 --port 8000  # (from src/) HTTP API incl. POST /chat
+python src/mcp_server.py                     # or the MCP server (learn/recall/forget/stats)
 ```
 
-## Results (honest) — full numbers in [`docs/BENCHMARK.md`](docs/BENCHMARK.md)
-LongMemEval_S, off-Qwen validation (local `bge-small` + `gpt-4o-mini`), n=20:
-- **recall@10: 95% = RAG.**
-- **QA accuracy-per-1k-tokens: Mnemo 41.2 > RAG 27.4 > full-context 0.5** (best efficiency;
-  45% acc on 1,092 tokens vs RAG 60% on 2,193 vs full-context 65% on 123,773).
-- **Long-horizon:** RAG 100%→50% as a fact is updated 2→12×; **Mnemo stays 100%.**
-- Weakness we report: temporal-reasoning QA (compression loses detail).
-
-We do **not** claim a leaderboard-topping accuracy number — a strong RAG wins one-shot
-retrieval. Mnemo wins on efficiency, long-horizon robustness, and capabilities RAG lacks.
-
-## Tests
+## Reproduce the paper
 ```bash
-python scripts/test_memory.py        # bi-temporal, supersession, time-travel, forgetting, budget
-python scripts/test_mnemo_e2e.py     # raw messages → distill → supersede → clean recall
+python scripts/test_memory.py ; python scripts/test_tenet_e2e.py               # capabilities
+python scripts/bench_horizon.py --principals 12 --k 6 --updates 2,4,6,8,10,12  # Fig. 1 (churn)
+python scripts/lme_recall.py --limit 20 --k 10 --qa --seed 2                    # Table 1 (frontier)
+python scripts/bench_knowledge_update.py --principals 4                         # ablation + efficiency
+# off-Qwen: prefix with  LLM_PROVIDER=openrouter EMBED_PROVIDER=local OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
-## Deploy on Alibaba Cloud
-Only `DASHSCOPE_API_KEY` is needed to run. Qwen Cloud/DashScope *is* Alibaba Cloud Model
-Studio, so the model + embedding calls satisfy the "uses Alibaba Cloud services/APIs"
-proof; `src/alicloud_oss.py` (OSS snapshots) is an optional stronger proof. Full runbook:
-[`docs/DEPLOY.md`](docs/DEPLOY.md).
+## Architecture
+![architecture](docs/architecture.svg)
 
-## Layout
+Two layers over one bi-temporal store (beliefs + evidence), two surfaces (MCP + HTTP),
+powered by Qwen Cloud (Alibaba Cloud Model Studio). Details: [`docs/DESIGN.md`](docs/DESIGN.md),
+positioning vs Mem0/Zep/Letta/Mastra: [`docs/COMPARISON.md`](docs/COMPARISON.md).
+
+## Repository
 ```
-src/  config.py memory.py distill.py mnemo.py mcp_server.py api.py alicloud_oss.py
-scripts/  smoke_test.py test_memory.py test_mnemo_e2e.py lme_recall.py bench_knowledge_update.py
-docs/  DESIGN.md SOTA.md BENCHMARK.md DEPLOY.md COMPETITION.md architecture.svg
+paper/tenet.md            the paper
+src/  agent.py            the assistant
+      tenet.py memory.py distill.py config.py   the belief-state memory engine
+      mcp_server.py api.py alicloud_oss.py       surfaces + Alibaba Cloud deploy
+scripts/ demo_agent.py    video walkthrough
+         bench_horizon.py bench_knowledge_update.py lme_recall.py   benchmarks
+         test_memory.py test_tenet_e2e.py smoke_test.py            tests
+docs/ BENCHMARK.md COMPARISON.md DESIGN.md DEPLOY.md SOTA.md  architecture.svg horizon.svg
+```
+
+## Citation
+```bibtex
+@misc{tenet2026,
+  title  = {Tenet: Agent Memory as a Self-Consistent World Model},
+  author = {Anas},
+  year   = {2026},
+  note   = {Global AI Hackathon with Qwen Cloud, Track 1},
+  url    = {https://github.com/Nas01010101/tenet}
+}
 ```
 
 ## License

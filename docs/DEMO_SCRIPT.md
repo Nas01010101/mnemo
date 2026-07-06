@@ -1,12 +1,12 @@
 # 3-minute demo video script
 
-Goal: show Mnemo *doing the hard things* (supersession, forgetting, time-travel, MCP),
+Goal: show Tenet *doing the hard things* (supersession, forgetting, time-travel, MCP),
 not just "it stores text". Record screen + voice; upload public to YouTube.
 
 **0:00 – 0:20 — Hook / problem**
 > "LLM agents forget between sessions, and most memory tools just append and retrieve.
 > The hard parts are facts that *change*, forgetting what's *stale*, and recalling under
-> a small context window. That's Mnemo."
+> a small context window. That's Tenet."
 
 **0:20 – 0:50 — Supersession (the money shot)**
 Terminal, run the e2e test or a live snippet:
@@ -43,4 +43,4 @@ Show Claude Desktop (or the MCP tool list) using `learn`/`recall`; show `smoke_t
 Show the `docs/BENCHMARK.md` table.
 > "On LongMemEval it's competitive with strong RAG on raw recall — but its real edge is
 > answering with the *current* value of a changed fact, forgetting, and time-travel,
-> which retrieval alone can't do. That's Mnemo: memory that manages itself."
+> which retrieval alone can't do. That's Tenet: memory that manages itself."

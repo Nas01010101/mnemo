@@ -1,17 +1,17 @@
-"""LongMemEval benchmark harness for Mnemo (the committed validation).
+"""LongMemEval benchmark harness for Tenet (the committed validation).
 
 Compares three read strategies on the same questions, LLM-judged (Qwen):
   • full   — dump all session text into the answerer (no memory)   [baseline]
   • rag    — embed turns, top-k cosine, no distill/bi-temporal      [baseline]
-  • mnemo  — distill -> bi-temporal store -> forgetting-aware recall [ours]
+  • tenet  — distill -> bi-temporal store -> forgetting-aware recall [ours]
 
 Reports overall + per-type accuracy, retrieval latency, and context tokens.
 Honest protocol: Qwen is answerer AND judge (we're on Qwen Cloud), so numbers are
 INDICATIVE and compared against our own baselines — not pasted onto the gpt-4o leaderboard.
 
 Usage:
-  python scripts/lme_bench.py --limit 5 --methods mnemo,full,rag          # cost probe
-  python scripts/lme_bench.py --limit 120 --methods mnemo,rag --seed 0    # real run
+  python scripts/lme_bench.py --limit 5 --methods tenet,full,rag          # cost probe
+  python scripts/lme_bench.py --limit 120 --methods tenet,rag --seed 0    # real run
 """
 import argparse, json, random, sys, time
 from pathlib import Path
@@ -19,7 +19,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import numpy as np  # noqa: E402
 import config       # noqa: E402
-from mnemo import Mnemo  # noqa: E402
+from tenet import Tenet  # noqa: E402
 
 DATA = Path(__file__).resolve().parent.parent / "data" / "lme" / "longmemeval_oracle.json"
 ANSWER_MODEL = config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus")
@@ -106,10 +106,10 @@ def run_rag(inst, k=10):
     return ans, lat, len(ctx)
 
 
-def run_mnemo(inst, k=10):
+def run_tenet(inst, k=10):
     import tempfile
     db = Path(tempfile.mkdtemp()) / "b.db"
-    m = Mnemo(db)
+    m = Tenet(db)
     # hybrid ingest per session: distilled keyed facts + raw verbatim slices
     for sess, date in zip(inst["haystack_sessions"], inst["haystack_dates"]):
         try:
@@ -125,13 +125,13 @@ def run_mnemo(inst, k=10):
     return ans, lat, len(ctx)
 
 
-RUNNERS = {"full": run_full, "rag": run_rag, "mnemo": run_mnemo}
+RUNNERS = {"full": run_full, "rag": run_rag, "tenet": run_tenet}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--limit", type=int, default=5)
-    ap.add_argument("--methods", default="mnemo,full,rag")
+    ap.add_argument("--methods", default="tenet,full,rag")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--skip-abstention", action="store_true", default=True)
     args = ap.parse_args()

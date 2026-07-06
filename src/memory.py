@@ -1,4 +1,4 @@
-"""MemoryCore — self-managing, bi-temporal memory for LLM agents (Mnemo, Track 1).
+"""MemoryCore — self-managing, bi-temporal memory for LLM agents (Tenet, Track 1).
 
 The three Track-1 asks, in one class:
   • efficient storage & retrieval  -> Qwen embeddings + sqlite + cosine (no LLM in read path)
@@ -28,7 +28,7 @@ import numpy as np
 
 import config
 
-_DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "mnemo.db"
+_DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "tenet.db"
 
 # Forgetting knobs
 _HALFLIFE_S = 14 * 24 * 3600  # a memory's recency weight halves every 14 days

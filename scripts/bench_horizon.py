@@ -2,7 +2,7 @@
 
 As a fact is updated MORE times over a long history, naive-RAG's top-k fills with stale
 versions of that fact and the reader must pick the latest from a noisy pile; accuracy
-degrades. Mnemo supersedes each update, so current recall returns exactly ONE value
+degrades. Tenet supersedes each update, so current recall returns exactly ONE value
 regardless of how many times it changed. We sweep the number of updates and plot both.
 
 Run: python scripts/bench_horizon.py --principals 6 --k 6
@@ -13,7 +13,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import numpy as np  # noqa: E402
 import config       # noqa: E402
-from mnemo import Mnemo  # noqa: E402
+from tenet import Tenet  # noqa: E402
 
 CITIES = ["Boston", "Denver", "Seattle", "Austin", "Chicago", "Miami",
           "Portland", "Atlanta", "Dallas", "Phoenix", "Nashville", "Raleigh"]
@@ -33,7 +33,8 @@ def answer(context):
         [{"role": "system", "content": "Answer using ONLY the memory provided. Give the "
           "user's CURRENT city. Reply with just the city name."},
          {"role": "user", "content": f"Memory:\n{context}\n\nQuestion: {Q}"}],
-        qwen_default="qwen3.7-plus", max_tokens=16)
+        qwen_default="qwen3.7-plus", max_tokens=16,
+        or_model=config.get("READER_MODEL", "") or None)
 
 
 def one(principal, n_updates, k, n_distractors):
@@ -50,7 +51,7 @@ def one(principal, n_updates, k, n_distractors):
     turns = [t for _o, t in events]
 
     # embed once, shared
-    m = Mnemo(Path(tempfile.mkdtemp()) / "h.db")
+    m = Tenet(Path(tempfile.mkdtemp()) / "h.db")
     vecs = m.core.embed_batch(turns)
     mat = np.array(vecs)
     qv = m.core.embed_batch([Q])[0]
@@ -60,9 +61,9 @@ def one(principal, n_updates, k, n_distractors):
     rag_ctx = "\n".join(turns[i] for i in sorted(top))
     rag_ok = latest.lower() in answer(rag_ctx).lower()
 
-    # Mnemo: ingest chronologically (supersession), recall current
+    # Tenet: ingest chronologically (supersession), recall current
     clock = [1e6]
-    m2 = Mnemo(Path(tempfile.mkdtemp()) / "h2.db", now=lambda: clock[0])
+    m2 = Tenet(Path(tempfile.mkdtemp()) / "h2.db", now=lambda: clock[0])
     for t in turns:
         role, content = t.split(": ", 1)
         m2.ingest_session([{"role": role, "content": content}], valid_at=clock[0])
@@ -85,7 +86,7 @@ def main():
     t0 = time.time()
     print(f"long-horizon knowledge-update (k={args.k}, distractors={args.distractors}, "
           f"{args.principals} principals/point)\n")
-    print(f"{'#updates':>9} | {'RAG acc':>8} | {'MNEMO acc':>9}")
+    print(f"{'#updates':>9} | {'RAG acc':>8} | {'TENET acc':>9}")
     print("-" * 32)
     results = []
     for nu in sweep:
@@ -100,7 +101,7 @@ def main():
     # headline
     deg_rag = results[0][1] - results[-1][1]
     deg_mem = results[0][2] - results[-1][2]
-    print(f"as updates {sweep[0]}→{sweep[-1]}: RAG {deg_rag:+.0f}pp, MNEMO {deg_mem:+.0f}pp")
+    print(f"as updates {sweep[0]}→{sweep[-1]}: RAG {deg_rag:+.0f}pp, TENET {deg_mem:+.0f}pp")
 
 
 if __name__ == "__main__":

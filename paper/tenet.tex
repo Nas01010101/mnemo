@@ -1,0 +1,202 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage[colorlinks=true,linkcolor=violet,urlcolor=violet,citecolor=violet]{hyperref}
+\usepackage{titlesec}
+\titlespacing*{\section}{0pt}{1.1ex}{0.6ex}
+\titlespacing*{\subsection}{0pt}{0.8ex}{0.4ex}
+\setlength{\parskip}{0.35em}
+\setlength{\parindent}{0pt}
+
+\title{\textbf{Tenet: Agent Memory as a Self-Consistent World Model}}
+\author{Anas\\\small Global AI Hackathon with Qwen Cloud (Track 1), 2026\\
+\small\texttt{https://github.com/Nas01010101/tenet}}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent Long-term memory for LLM agents is almost universally implemented as
+\emph{retrieval over a growing log of past turns}---a document-retrieval abstraction. We
+argue this is the wrong abstraction for an agent that must model a changing world. We
+introduce \textbf{knowledge churn}---the repeated updating of a fact over a long
+interaction---and show that retrieval-augmented memory (RAG-memory) \emph{silently
+degrades} under it: as the number of stale versions of a fact exceeds the retrieval budget
+$k$, the reader is handed conflicting values and answers incorrectly. On a controlled
+benchmark, a strong RAG-memory falls from $100\%$ to $50\%$ current-value accuracy as a
+fact is updated $2\!\to\!12$ times. We propose \textbf{Tenet}, which reframes memory as a
+\textbf{self-consistent belief state}---a compact \emph{world model of the user}---rather
+than a document store. Tenet (i)~distills raw turns into atomic, keyed facts; (ii)~maintains
+a \textbf{bi-temporal} record so a changed fact \emph{supersedes} its predecessor (retired
+to history, not overwritten); (iii)~enforces \textbf{belief--evidence consistency} by
+retiring raw evidence that echoes a superseded belief; and (iv)~applies a
+\textbf{predictive-coding write policy}---surprise-gating---that stores only observations the
+model cannot already predict. Tenet holds \textbf{$100\%$ current-value accuracy across all
+churn levels}, matches strong RAG on retrieval recall ($95\%$), and attains the \textbf{best
+answer-accuracy-per-token} of the systems we evaluate. We report where strong RAG still
+wins---one-shot retrieval and multi-hop temporal synthesis---and release all code.
+\end{abstract}
+
+\section{Introduction}
+An agent that talks to a user for months does not need a transcript; it needs a
+\emph{model of the user} that stays true as the user changes. Yet the dominant memory
+design---retrieval-augmented generation over stored turns~\cite{mem0,longmemeval}---treats
+memory as a document index: embed every turn, retrieve the top-$k$ most similar, let the
+reader sort it out. This works for one-shot recall of a \emph{static} fact. It fails,
+quietly, when facts \textbf{change}.
+
+We formalize this as \textbf{knowledge churn}. A user who moves cities several times
+generates many ``I moved to $X$'' turns; all are similar to ``where do I live?'', so the
+top-$k$ fills with \emph{stale} versions. Once the number of updates exceeds $k$, the latest
+value may not be retrieved at all, and even when it is, the reader must infer recency from
+contradictory statements. Accuracy collapses (\S\ref{sec:churn}).
+
+The root problem is abstraction. A document store has no notion that ``I live in Boston''
+and ``I live in Seattle'' are the \emph{same fact} with a \emph{changed value}. We argue
+memory should be a \textbf{belief state}: a compact set of \emph{current} beliefs, each with
+a temporal extent, updated by observation, kept internally consistent, and queryable across
+time---the stance world-model and predictive-coding accounts take toward
+perception~\cite{friston}, brought to agent memory.
+
+\textbf{Contributions.}
+\begin{enumerate}\itemsep2pt
+\item We identify and name \textbf{knowledge churn}, a failure mode of retrieval memory, and
+give a controlled benchmark exhibiting it (RAG: $100\%\!\to\!50\%$; \S\ref{sec:churn}).
+\item We present \textbf{Tenet}, a memory that is a self-consistent belief state:
+bi-temporal supersession, a \textbf{belief--evidence consistency} rule, and a
+\textbf{surprise-gated} (predictive-coding) write policy.
+\item We evaluate on LongMemEval\_S and controlled tests: Tenet is \textbf{churn-robust
+($100\%$)}, on par with RAG on recall ($95\%$), and \textbf{best on accuracy-per-token}. We
+are explicit about where strong RAG still wins.
+\end{enumerate}
+
+\section{Related Work}
+\textbf{Retrieval memory.} Mem0~\cite{mem0} distills salient facts at write time over a
+vector store; it attaches only a \emph{creation} timestamp and \emph{removed} its graph
+variant after finding it $3\times$ slower / $2\times$ tokens for a thin gain---evidence we
+weigh in choosing a light substrate. LongMemEval~\cite{longmemeval} is the standard
+long-horizon benchmark; its V2 adds a \emph{latency-aware} metric, a field shift toward
+accuracy \emph{per cost} that our per-token results target.
+\textbf{Temporal knowledge graphs.} Zep/Graphiti~\cite{zep} maintain a bi-temporal graph
+with automatic invalidation---the closest prior work---but pay heavy per-write extraction
+and require graph infrastructure; Tenet keeps the bi-temporal semantics without the graph.
+\textbf{OS-style / observational memory.} MemGPT/Letta~\cite{memgpt} page memory between
+context and archival storage; observational schemes keep a stable summary. Both are largely
+append-oriented and do not treat supersession or forgetting as first-class.
+\textbf{What is missing.} No prior system combines bi-temporal supersession,
+\emph{belief--evidence consistency}, \emph{predictive-coding write-gating}, and principled
+forgetting in a light, graph-free store---nor reports the knowledge-churn regime.
+
+\section{Method}
+Tenet stores two layers over one bi-temporal table: a \textbf{belief layer} of distilled,
+keyed facts, and an \textbf{evidence layer} of raw turns. Reads never call an LLM.
+
+\textbf{Distillation.} Each turn is distilled into atomic facts, each with a stable
+semantic key $\kappa=\textit{subject}\!:\!\textit{attribute}$ (e.g.\ \texttt{user:residence}),
+a salience $s\in[0,1]$, and an event time. The key makes supersession reliable: embedding
+similarity cannot separate a \emph{restated} fact from a \emph{value-changed} one (we measure
+a value change at cosine $0.99$, indistinguishable from a paraphrase), but a shared key can.
+
+\textbf{Bi-temporal supersession.} Every memory carries event time
+($\texttt{valid\_at},\texttt{invalid\_at}$) and transaction time
+($\texttt{created\_at},\texttt{expired\_at}$). Storing a fact at key $\kappa$ whose value
+differs from the current one \emph{supersedes} it: the old fact's
+$\texttt{invalid\_at}/\texttt{expired\_at}$ are set; it leaves the current set but stays in
+history. Current recall filters $\texttt{expired\_at}=\varnothing$; $\text{recall}(as\_of{=}t)$
+reconstructs the belief set at any past $t$ (time-travel).
+
+\textbf{Belief--evidence consistency (key rule).} The evidence layer answers detail
+questions but is where stale values hide: ``I moved to Boston'' survives after the belief
+moves on. We retire from current recall any raw slice $e$ close to a \emph{superseded} belief:
+\[
+\text{exclude } e \iff \max_{f\in\mathcal{F}_{\text{expired}}}\cos(e,f)\ \ge\ \tau_{\text{stale}},
+\qquad \tau_{\text{stale}}=0.80.
+\]
+This single rule turns supersession into end-to-end correctness: $55\%\!\to\!100\%$
+(\S\ref{sec:abl}).
+
+\textbf{Predictive-coding write policy.} A world model stores \emph{prediction error}. On
+write, a raw observation $e$ is discarded if the store already predicts it:
+\[
+\text{store } e \iff \max_{e'\in\text{store}}\cos(e,e')\ <\ g_{\text{surprise}},
+\qquad g_{\text{surprise}}=0.97 .
+\]
+This bounds the store and drops redundant repetition with no accuracy loss (\S\ref{sec:abl}).
+
+\textbf{Forgetting.} Rank $=$ relevance $\times$ decay, with
+$d = 2^{-\Delta t/h}\,(1+\beta\log(1{+}\text{uses}))\,(0.6+0.8s)$, half-life $h=14$\,d; a
+sweep archives low-$d$ unpinned memories. Retrieval is a \emph{dual pool} (beliefs for
+consistency, evidence for verbatim detail), each guaranteed a budget share.
+
+\section{Experiments}
+\textbf{Protocol.} LongMemEval\_S (500 questions, ${\sim}115$k-token histories).
+We use a \textbf{\texttt{gpt-4o} reader} (the same reader Mem0 and Zep report against), a local embedder (\texttt{bge-small}), and a cheap \texttt{gpt-4o-mini} distiller; the shipped system runs the same code on Qwen Cloud (\texttt{text-embedding-v4}, \texttt{qwen3.7-plus}) by a config flip. Numbers are compared only to baselines run under identical settings.
+Baselines: \textbf{RAG} (top-$k$ raw turns) and \textbf{full-context} (entire history).
+
+\subsection{Retrieval recall and the accuracy-per-token frontier (n$=$40, gpt-4o reader)}
+\label{sec:frontier}
+\begin{center}\small
+\begin{tabular}{lrrrr}
+\toprule
+System & recall@10 & QA acc & reader tok & \textbf{acc/1k tok} \\
+\midrule
+full-context & --- & 65\%$^{*}$ & ${\sim}124\text{k}$ & 0.5$^{*}$ \\
+RAG          & 95\% & \textbf{65\%} & 2{,}101 & 30.9 \\
+\textbf{Tenet} & \textbf{97.5\%} & 52.5\% & \textbf{1{,}067} & \textbf{49.2} \\
+\bottomrule
+\end{tabular}
+\end{center}
+Tenet matches RAG on recall and gives the best accuracy per token. On raw accuracy it
+is beaten by a strong RAG ($52.5$ vs $65$); the gap is in \emph{multi-session} ($28.6$ vs $57.1$) and single-session assistant/preference, where compression drops detail though recall is $95$--$100\%$---the loss is compression, not retrieval. Tenet gives the best accuracy-per-token ($1.6\times$ RAG). $^{*}$Full-context, at a weaker reader, spends $100\times$ the tokens for no gain over RAG. The pattern is reader-robust: with a frontier reader (\texttt{claude-opus-4.8}) it is unchanged---RAG $67.5$ / Tenet $57.5$, acc/1k-tok $32.1$ / $53.9$ ($1.7\times$).
+
+\subsection{Knowledge churn (headline)}
+\label{sec:churn}
+One fact updated $N$ times amid distractors, $k=6$, 12 principals/point:
+\begin{center}\small
+\begin{tabular}{lrrrrrr}
+\toprule
+updates $N$ & 2 & 4 & 6 & 8 & 10 & 12 \\
+\midrule
+RAG            & 100 & 100 & 100 & 67 & 58 & \textbf{50} \\
+\textbf{Tenet} & 100 & 100 & 100 & \textbf{100} & \textbf{100} & \textbf{100} \\
+\bottomrule
+\end{tabular}
+\end{center}
+RAG degrades monotonically once $N>k$ ($-50$\,pp); Tenet is flat at $100\%$. Supersession
+keeps exactly one current value regardless of churn---the property a \emph{belief state} has
+and a document index cannot. \textbf{The curves are identical under a \texttt{gpt-4o-mini} and a \texttt{gpt-4o} reader}: the failure is structural (once $N>k$ the latest value is not reliably retrieved), so a stronger reader cannot rescue RAG.
+
+\subsection{Ablations}
+\label{sec:abl}
+\textbf{Belief--evidence consistency.} Removing the rule drops Tenet to $55\%$ current-value
+accuracy with a $45\%$ stale-leak; adding it restores $100\%$ / $0\%$ leak---the single most
+important mechanism. \textbf{Surprise-gating} discards $15\%$ of observations as redundant
+with no accuracy change, yielding a bounded store where RAG grows unboundedly.
+
+\section{Limitations}
+\textbf{Not a better one-shot retriever}---a well-tuned RAG matches or beats Tenet on static
+recall; Tenet's edge is churn-robustness, per-token efficiency, and capabilities RAG lacks.
+\textbf{Multi-hop temporal synthesis} is the weakest category: distillation compresses away
+fine detail even when the right session is retrieved; a promising fix is \emph{query-aware
+evidence expansion}. \textbf{Evaluation}: $n{=}40$, off-Qwen (gpt-4o reader, local embedder); the shipped system uses Qwen Cloud. Temporal-reasoning, weak under a mini reader, recovers to $40\%$ under gpt-4o.
+
+\section{Conclusion}
+Treating agent memory as a \textbf{self-consistent belief state} rather than a document index
+makes it robust to the way real knowledge behaves: it changes. Tenet stays correct under
+knowledge churn where retrieval memory collapses, at the best accuracy-per-token we tested,
+with a light graph-free substrate and no LLM in the read path---and gets time-travel and
+principled forgetting for free. We hope \emph{knowledge churn} becomes a standard axis for
+evaluating agent memory.
+
+\begin{thebibliography}{9}\small
+\bibitem{mem0} Chhikara et al. \emph{Mem0: Production-Ready AI Agents with Scalable Long-Term Memory}. arXiv:2504.19413, 2025.
+\bibitem{longmemeval} Wu et al. \emph{LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory}. arXiv:2410.10813, 2024.
+\bibitem{zep} Rasmussen et al. \emph{Zep: A Temporal Knowledge Graph Architecture for Agent Memory}. arXiv:2501.13956, 2025.
+\bibitem{memgpt} Packer et al. \emph{MemGPT: Towards LLMs as Operating Systems}. arXiv:2310.08560, 2023.
+\bibitem{friston} Friston. \emph{The free-energy principle: a unified brain theory?} Nat.\ Rev.\ Neurosci., 2010.
+\end{thebibliography}
+
+\end{document}

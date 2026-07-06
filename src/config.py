@@ -87,13 +87,15 @@ def chat_model(qwen_default: str) -> str:
 
 
 def chat(messages, *, qwen_default: str, max_tokens: int = 512, temperature: float = 0,
-         json_mode: bool = False) -> str:
+         json_mode: bool = False, or_model: str | None = None) -> str:
     """Unified chat completion returning text. Routes qwen/openrouter (OpenAI SDK) or
-    agy (Gemini CLI, off-Claude-plan)."""
+    agy (Gemini CLI, off-Claude-plan). `or_model` overrides the OpenRouter model for
+    this call (e.g. a strong reader while distillation stays cheap)."""
     if LLM_PROVIDER == "agy":
         return _agy_chat(messages)
     import time as _t
-    kw = {"model": chat_model(qwen_default), "messages": messages,
+    model = or_model if (LLM_PROVIDER == "openrouter" and or_model) else chat_model(qwen_default)
+    kw = {"model": model, "messages": messages,
           "temperature": temperature, "max_tokens": max_tokens}
     if LLM_PROVIDER == "qwen":
         kw["extra_body"] = {"enable_thinking": False}

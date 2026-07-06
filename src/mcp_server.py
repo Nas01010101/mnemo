@@ -1,20 +1,20 @@
-"""Mnemo MCP server — exposes the self-managing memory core as MCP tools so any
+"""Tenet MCP server — exposes the self-managing memory core as MCP tools so any
 MCP client (Claude Desktop, IDEs, other agents) gains persistent memory.
 
 Run (stdio):   python src/mcp_server.py
 Claude Desktop config:
-    { "mcpServers": { "mnemo": { "command": "python",
+    { "mcpServers": { "tenet": { "command": "python",
         "args": ["/ABS/PATH/qwen-hackathon/src/mcp_server.py"] } } }
 """
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from mnemo import Mnemo
+from tenet import Tenet
 
-mcp = FastMCP("mnemo")
-_mnemo = Mnemo()
-_core = _mnemo.core
+mcp = FastMCP("tenet")
+_tenet = Tenet()
+_core = _tenet.core
 
 
 @mcp.tool()
@@ -22,7 +22,7 @@ def learn(message: str, pinned: bool = False) -> str:
     """Ingest a raw message/note: automatically distill it into atomic facts, then
     store each with supersession (a changed fact retires the old value, history kept).
     This is the main write path — prefer it over `remember` for conversational input."""
-    ids = _mnemo.ingest(message, pinned=pinned)
+    ids = _tenet.ingest(message, pinned=pinned)
     return f"learned {len(ids)} fact(s)" if ids else "no durable fact found"
 
 

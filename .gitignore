@@ -31,3 +31,9 @@ recordings/
 # ---- Local data (memory store) ----
 data/
 *.db
+
+# ---- LaTeX build artifacts ----
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc

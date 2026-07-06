@@ -1,4 +1,4 @@
-"""Honest recall benchmark for Mnemo.
+"""Honest recall benchmark for Tenet.
 
 Plants known facts across a long, noisy multi-session history, then asks questions
 and measures:
@@ -85,7 +85,7 @@ def main() -> int:
     saved = 100 * (1 - avg_retrieved / total_hist_chars)
 
     print(f"History: {len(NOISE)} noise + {n} facts = {total_hist_chars} chars total")
-    print(f"recall@{k}  Mnemo (semantic+decay): {sem_hits}/{n} = {100*sem_hits/n:.0f}%")
+    print(f"recall@{k}  Tenet (semantic+decay): {sem_hits}/{n} = {100*sem_hits/n:.0f}%")
     print(f"recall@{k}  recency baseline:        {base_hits}/{n} = {100*base_hits/n:.0f}%")
     print(f"context saved vs full history: {saved:.1f}%  (avg {avg_retrieved:.0f} vs {total_hist_chars} chars)")
 
@@ -97,7 +97,7 @@ def main() -> int:
 
     core.close()
     ok = sem_hits >= base_hits and sem_hits >= n - 1
-    print("\n" + ("RESULT: Mnemo >= baseline ✅" if ok else "RESULT: needs tuning ⚠️"))
+    print("\n" + ("RESULT: Tenet >= baseline ✅" if ok else "RESULT: needs tuning ⚠️"))
     return 0 if ok else 1
 
 

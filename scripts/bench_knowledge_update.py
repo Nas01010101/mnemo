@@ -7,7 +7,7 @@ ask for the CURRENT value of each fact.
 
   • naive-RAG retrieves the top-k most similar turns — which include BOTH the stale
     and the current statements, so the reader sees conflicting values.
-  • Mnemo supersedes: the old value is retired (expired_at set), so current recall
+  • Tenet supersedes: the old value is retired (expired_at set), so current recall
     returns ONLY the latest value.
 
 Metrics (per updated fact):
@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import numpy as np  # noqa: E402
 import config       # noqa: E402
-from mnemo import Mnemo  # noqa: E402
+from tenet import Tenet  # noqa: E402
 
 _usage = {"in": 0, "out": 0}
 
@@ -102,16 +102,16 @@ def run_principal(seed_offset, k):
     turns = [t["content"] for s in sessions for t in s]
 
     # shared embeddings
-    m = Mnemo(Path(tempfile.mkdtemp()) / "ku.db")
+    m = Tenet(Path(tempfile.mkdtemp()) / "ku.db")
     vecs = m.core.embed_batch([f"User: {t}" for t in turns])
 
     # naive-RAG store (just the raw turns + vectors)
     rag_texts = [f"User: {t}" for t in turns]
     rag_mat = np.array(vecs)
 
-    # Mnemo: ingest each session (distill+supersede) in chronological order
+    # Tenet: ingest each session (distill+supersede) in chronological order
     clock = [1_000_000.0]
-    m2 = Mnemo(Path(tempfile.mkdtemp()) / "ku2.db", now=lambda: clock[0])
+    m2 = Tenet(Path(tempfile.mkdtemp()) / "ku2.db", now=lambda: clock[0])
     raw_kept = 0
     for s in sessions:
         raw_kept += len(m2.ingest_session(s, valid_at=clock[0])["raw"]); clock[0] += 3600
@@ -125,7 +125,7 @@ def run_principal(seed_offset, k):
         top = np.argsort(-sims)[:k]
         rag_ctx = "\n".join(rag_texts[i] for i in sorted(top))
         rag_ans = answer(rag_ctx, q)
-        # Mnemo current recall
+        # Tenet current recall
         mem_ctx = "\n".join(f"- {h.text}" for h in m2.core.recall(q, k=k))
         mem_ans = answer(mem_ctx, q)
         r_ok, r_leak = score(rag_ans, latest, stale)
@@ -155,20 +155,20 @@ def main():
             attr, latest, ra, ma, rok, rleak, mok, mleak, rcl, mcl = r
             print(f"[p{p}] {attr:10s} latest={latest:14s} | "
                   f"RAG={'✓' if rok else '✗'}{'⚠leak' if rleak else '':5s} '{ra[:22]}' | "
-                  f"MNEMO={'✓' if mok else '✗'}{'⚠leak' if mleak else '':5s} '{ma[:22]}'")
+                  f"TENET={'✓' if mok else '✗'}{'⚠leak' if mleak else '':5s} '{ma[:22]}'")
 
     n = len(all_rows)
     def rate(idx): return 100 * sum(r[idx] for r in all_rows) / n
     avg = lambda idx: sum(r[idx] for r in all_rows) / n
     print(f"\n=== knowledge-update: current-value accuracy (n={n}, k={args.k}) ===")
     print(f"RAG    current-correct={rate(4):5.1f}%   stale-leak={rate(5):5.1f}%")
-    print(f"MNEMO  current-correct={rate(6):5.1f}%   stale-leak={rate(7):5.1f}%")
+    print(f"TENET  current-correct={rate(6):5.1f}%   stale-leak={rate(7):5.1f}%")
     # efficiency (the world-model win): compact belief-state recall vs raw dump
     full_chars = sum(s["full_hist_chars"] for s in stores) / len(stores)
     print(f"\n=== efficiency ===")
     print(f"context chars fed to reader:  full-history≈{full_chars:.0f}  "
-          f"RAG≈{avg(8):.0f}  MNEMO≈{avg(9):.0f}")
-    print(f"  → MNEMO reads {100*(1-avg(9)/avg(8)):.0f}% less context than RAG, "
+          f"RAG≈{avg(8):.0f}  TENET≈{avg(9):.0f}")
+    print(f"  → TENET reads {100*(1-avg(9)/avg(8)):.0f}% less context than RAG, "
           f"{100*(1-avg(9)/full_chars):.0f}% less than full history")
     turns = sum(s["turns"] for s in stores); stored = sum(s["raw_stored"] for s in stores)
     print(f"surprise-gated storage: {stored} memories kept from {turns} turns "
