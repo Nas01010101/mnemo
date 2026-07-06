@@ -5,7 +5,7 @@
 the highest-leverage thing to expose over MCP. Plays to real strength; fastest path
 to a *production-grade* (not toy) demo before the Jul 9 deadline.
 
-## Product: **Mnemo** — a self-managing memory service, exposed over MCP
+## Product: **Tenet** — a self-managing memory service, exposed over MCP
 
 One-liner: *Give any LLM client persistent memory that stores, forgets, and recalls
 on its own — plug it into Claude Desktop / any MCP client, or call it over HTTP.*

@@ -8,25 +8,25 @@ Copy-paste ready. Fill the two bracketed links after you push the repo + upload 
 **Track 1: MemoryAgent**
 
 ## Project name
-**Mnemo — self-managing bi-temporal memory for AI agents**
+**Tenet — self-managing bi-temporal memory for AI agents**
 
 ## Elevator pitch (≤ 200 chars)
 A personal AI assistant on Qwen Cloud whose memory stays true as your life changes — it
 supersedes facts, time-travels to what you used to say, and forgets stale trivia.
 
 ## Text description
-**Mnemo is a personal AI assistant** (`src/agent.py`) that remembers you across sessions
+**Tenet is a personal AI assistant** (`src/agent.py`) that remembers you across sessions
 and — unlike a chatbot bolted onto RAG — **stays correct when your facts change**. Move
 cities, change jobs, update a preference, and it tracks the *current* truth; ask what you
 used to say and it recalls the history; it forgets stale trivia on its own. It's powered
-by **Mnemo**, a memory engine built for the parts append-and-retrieve systems get wrong.
+by **Tenet**, a memory engine built for the parts append-and-retrieve systems get wrong.
 
 **The problem.** LLM agents forget between sessions, and memory layers bolted on top mostly
 *append and retrieve* — they don't handle a fact that **changes** over time, **forgetting**
 what's gone stale, or **recalling** under a small context window. Track 1 asks for exactly
 those three.
 
-**Mnemo** is a memory service built around them:
+**Tenet** is a memory service built around them:
 - **Bi-temporal model** — every fact carries *event time* (`valid_at`/`invalid_at`) and
   *transaction time* (`created_at`/`expired_at`). When a fact changes, the old value is
   **superseded** (retired to history), not overwritten — so current recall returns only
@@ -48,10 +48,10 @@ for distillation, `qwen3.7-plus` for reading — all via the OpenAI-compatible D
 (Alibaba Cloud Model Studio) API. Optional Alibaba Cloud OSS snapshots for durability.
 
 **Honest evaluation (LongMemEval_S).** Recall@10 is on par with strong RAG (95%=95%).
-Mnemo delivers the **best accuracy-per-token** (41.2 vs RAG 27.4 vs full-context 0.5 acc
+Tenet delivers the **best accuracy-per-token** (41.2 vs RAG 27.4 vs full-context 0.5 acc
 per 1k reader-tokens) — matching most of RAG's answer quality on half the context. And in
 the **long-horizon regime** — a fact updated many times — **RAG collapses (100%→50%) while
-Mnemo holds 100%**, because supersession keeps exactly one current value instead of a pile
+Tenet holds 100%**, because supersession keeps exactly one current value instead of a pile
 of stale ones. We're explicit about the weak spot: multi-hop temporal synthesis, where
 compression costs accuracy. Full numbers in `docs/BENCHMARK.md`.
 
@@ -65,7 +65,7 @@ surprise-gated writes (predictive-coding efficiency) — exposed over MCP.
 `FastAPI` · `sqlite` · `NumPy` · `Alibaba Cloud OSS` · `Python`
 
 ## Links (fill in)
-- **Code repository:** https://github.com/Nas01010101/mnemo (public, MIT license visible in About)
+- **Code repository:** https://github.com/Nas01010101/tenet (public, MIT license visible in About)
 - **Demo video (≤3 min):** [YOUTUBE URL]
 - **Architecture diagram:** `docs/architecture.svg` in the repo
 - **Proof of Alibaba Cloud services/APIs:** `src/config.py` + `src/distill.py` +

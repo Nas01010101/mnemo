@@ -1,4 +1,4 @@
-"""Write-time distillation (Mnemo Upgrade B).
+"""Write-time distillation (Tenet Upgrade B).
 
 Turns a raw conversation turn / note into atomic, self-contained facts with a
 semantic key for supersession, a salience score for forgetting, and an optional

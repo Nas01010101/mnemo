@@ -1,8 +1,8 @@
-"""Mnemo Assistant — a personal agent with self-managing memory (Track 1).
+"""Tenet Assistant — a personal agent with self-managing memory (Track 1).
 
 A conversational assistant that remembers you across sessions, stays correct when your
 facts CHANGE (supersession), can recall what you *used* to say (time-travel), and forgets
-stale trivia. This is the agent Track 1 asks for; Mnemo (src/mnemo.py) is its memory.
+stale trivia. This is the agent Track 1 asks for; Tenet (src/tenet.py) is its memory.
 
 Run the interactive assistant:   python src/agent.py
 Powered by Qwen Cloud (config.py provider layer).
@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 
 import config
-from mnemo import Mnemo
+from tenet import Tenet
 
 _SYS = """You are a warm, concise personal assistant with long-term memory of the user.
 Use ONLY the remembered facts below to personalise your reply; never invent facts about
@@ -24,7 +24,7 @@ What you remember about the user:
 
 class MemoryAgent:
     def __init__(self, db_path=None, *, now=time.time):
-        self.m = Mnemo(db_path, now=now) if db_path else Mnemo(now=now)
+        self.m = Tenet(db_path, now=now) if db_path else Tenet(now=now)
 
     def respond(self, user_msg: str, *, k: int = 8) -> dict:
         """Recall relevant memory → answer with Qwen → learn from what the user said."""
@@ -51,7 +51,7 @@ class MemoryAgent:
 
 def main():  # simple REPL
     agent = MemoryAgent()
-    print("Mnemo Assistant — I remember across sessions. (Ctrl-C to exit)")
+    print("Tenet Assistant — I remember across sessions. (Ctrl-C to exit)")
     print(f"currently holding: {agent.stats()}")
     while True:
         try:

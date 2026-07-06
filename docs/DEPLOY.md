@@ -1,7 +1,7 @@
-# Deploying Mnemo on Alibaba Cloud (mandatory Proof-of-Deployment)
+# Deploying Tenet on Alibaba Cloud (mandatory Proof-of-Deployment)
 
 ## Credentials reality (what you actually need)
-- **To RUN Mnemo: only `DASHSCOPE_API_KEY`.** Nothing else. The app never calls OSS
+- **To RUN Tenet: only `DASHSCOPE_API_KEY`.** Nothing else. The app never calls OSS
   unless you explicitly invoke `src/alicloud_oss.py`.
 - **"Uses Alibaba Cloud services and APIs" proof — already satisfied.** Qwen Cloud /
   DashScope *is* Alibaba Cloud Model Studio; every model + embedding call in

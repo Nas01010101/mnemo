@@ -1,4 +1,4 @@
-"""Mnemo HTTP API — the deployable backend (runs on Alibaba Cloud).
+"""Tenet HTTP API — the deployable backend (runs on Alibaba Cloud).
 
 This is the surface judges can `curl`, and the process shown running on Alibaba
 Cloud for the mandatory proof-of-deployment. Same MemoryCore as the MCP server.
@@ -10,19 +10,19 @@ from __future__ import annotations
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from mnemo import Mnemo
+from tenet import Tenet
 
 app = FastAPI(
-    title="Mnemo — Self-Managing Memory API",
+    title="Tenet — Self-Managing Memory API",
     description="Persistent, self-forgetting, bi-temporal memory for LLM agents, powered by Qwen Cloud.",
     version="0.2.0",
 )
-_mnemo = Mnemo()
-_core = _mnemo.core
+_tenet = Tenet()
+_core = _tenet.core
 
 from agent import MemoryAgent  # noqa: E402
 _agent = MemoryAgent()
-_agent.m = _mnemo  # the assistant shares the one memory store
+_agent.m = _tenet  # the assistant shares the one memory store
 
 
 class ChatReq(BaseModel):
@@ -52,7 +52,7 @@ def health():
 
 @app.post("/chat")
 def chat(req: ChatReq):
-    """The Mnemo Assistant: recall relevant memory → answer with Qwen → learn from the
+    """The Tenet Assistant: recall relevant memory → answer with Qwen → learn from the
     message (with supersession). A persistent, self-managing memory agent over HTTP."""
     return _agent.respond(req.message)
 
@@ -60,7 +60,7 @@ def chat(req: ChatReq):
 @app.post("/ingest")
 def ingest(req: IngestReq):
     """Distill a raw message into atomic facts and store them (with supersession)."""
-    ids = _mnemo.ingest(req.message, pinned=req.pinned)
+    ids = _tenet.ingest(req.message, pinned=req.pinned)
     return {"stored": len(ids), "ids": ids}
 
 

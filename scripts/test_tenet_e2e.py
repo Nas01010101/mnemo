@@ -1,11 +1,11 @@
 """End-to-end: raw messages -> distill -> bi-temporal store -> recall + supersession.
-Run: python scripts/test_mnemo_e2e.py
+Run: python scripts/test_tenet_e2e.py
 """
 import sys, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from mnemo import Mnemo  # noqa: E402
+from tenet import Tenet  # noqa: E402
 
 clock = {"t": 1_000_000.0}
 def now(): return clock["t"]
@@ -13,7 +13,7 @@ def now(): return clock["t"]
 
 def main() -> int:
     db = Path(tempfile.mkdtemp()) / "e2e.db"
-    m = Mnemo(db, now=now)
+    m = Tenet(db, now=now)
     fails = []
 
     # Session 1

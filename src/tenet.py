@@ -1,6 +1,6 @@
-"""Mnemo — the memory agent: distillation + bi-temporal store, one interface.
+"""Tenet — the memory agent: distillation + bi-temporal store, one interface.
 
-    m = Mnemo()
+    m = Tenet()
     m.ingest("I moved to Toronto last week.")   # distills -> atomic keyed facts -> store
     m.recall("where does the user live?")        # bi-temporal, forgetting-aware retrieval
 
@@ -16,7 +16,7 @@ from distill import distill
 from memory import Memory, MemoryCore
 
 
-class Mnemo:
+class Tenet:
     def __init__(self, db_path=None, *, now=time.time, distill_model: str | None = None):
         self.core = MemoryCore(db_path, now=now) if db_path else MemoryCore(now=now)
         self._now = now

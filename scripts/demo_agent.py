@@ -1,4 +1,4 @@
-"""Scripted demo of the Mnemo Assistant — the story for the 3-min video.
+"""Scripted demo of the Tenet Assistant — the story for the 3-min video.
 
 Shows an assistant that (1) learns facts, (2) recalls them personally, (3) stays correct
 when a fact CHANGES, (4) can time-travel to what you used to say, (5) forgets trivia.
@@ -53,7 +53,7 @@ def main():
 
     print(f"\n\033[90mstore: {agent.stats()}  "
           f"(old values retired to history, not deleted)\033[0m")
-    print("\n\033[1mMnemo: an assistant whose memory stays true as your life changes.\033[0m")
+    print("\n\033[1mTenet: an assistant whose memory stays true as your life changes.\033[0m")
 
 
 if __name__ == "__main__":
