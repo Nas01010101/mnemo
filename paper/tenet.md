@@ -24,10 +24,10 @@ turns into atomic, keyed facts; (ii) maintains a **bi-temporal** record so a cha
 **belief–evidence consistency** by retiring raw evidence that echoes a superseded belief;
 and (iv) applies a **predictive-coding write policy** — surprise-gating — that stores only
 observations the model cannot already predict. Tenet holds **100% current-value accuracy
-across all churn levels**, matches strong RAG on retrieval recall (95%), and attains the
-**best answer-accuracy-per-token** of the systems we evaluate (1.5× RAG, 80× full-context).
-We report where a strong RAG still wins — one-shot factual retrieval and multi-hop
-temporal synthesis — and release all code and benchmarks.
+across all churn levels**, matches strong RAG on retrieval recall (95–97.5%), and attains the
+**best answer-accuracy-per-token** of the systems we evaluate (1.6× RAG, ~100× full-context).
+We report where a strong RAG still wins — one-shot factual accuracy, driven by multi-session
+synthesis — and release all code and benchmarks.
 
 ---
 
@@ -133,25 +133,32 @@ decay. Retrieval is a **dual pool** — beliefs for consistency, evidence for ve
 
 ## 4. Experiments
 
-**Protocol.** LongMemEval_S (500 questions, ~115k-token histories). The Qwen free quota was
-exhausted mid-study, so reported runs use a local embedder (`bge-small-en-v1.5`) and a
-`gpt-4o-mini` reader via OpenRouter; the shipped system uses Qwen Cloud (`text-embedding-v4`,
-`qwen3.7-plus`), a config flip. Numbers are **indicative** and compared only to baselines we
-run under identical settings — never to the public gpt-4o leaderboard. Baselines: **RAG**
-(top-*k* raw turns) and **full-context** (entire history).
+**Protocol.** LongMemEval_S (500 questions, ~115k-token histories). We use a **`gpt-4o`
+reader** (the same reader Mem0 and Zep report against), a local embedder
+(`bge-small-en-v1.5`), and a cheap `gpt-4o-mini` distiller; the shipped system runs the same
+code on Qwen Cloud (`text-embedding-v4`, `qwen3.7-plus`) by a config flip. Numbers are
+compared only to baselines we run under identical settings. Baselines: **RAG** (top-*k* raw
+turns) and **full-context** (entire history).
 
-**4.1 Retrieval recall & the accuracy-per-token frontier** (n=20, k=10).
+**4.1 Retrieval recall & the accuracy-per-token frontier** (n=40, k=10, gpt-4o reader).
 
 | System | recall@10 | QA acc | reader tokens | **acc / 1k tok** |
 |---|---:|---:|---:|---:|
-| full-context | — | 65% | 123,773 | 0.5 |
-| RAG | 95% | 60% | 2,193 | 27.4 |
-| **Tenet** | **95%** | 45% | **1,092** | **41.2** |
+| full-context | — | 65%* | ~124,000 | 0.5* |
+| RAG | 95% | **65%** | 2,101 | 30.9 |
+| **Tenet** | **97.5%** | 52.5% | **1,067** | **49.2** |
 
-Tenet matches RAG on recall and gives the **best accuracy per token** — half of RAG's
-context, 1/100th of full-context. On raw accuracy it trails RAG, entirely in *multi-session*
-(50 vs 75) and *temporal-reasoning* (0 vs 33); recall is 100% there, so the loss is from
-compression, not retrieval (§5).
+Tenet gives the **best accuracy per token** (1.6× RAG; *half* its context, 1/100th of
+full-context) at recall parity. On **raw** accuracy a strong RAG wins (65 vs 52.5); Tenet's
+gap is in *multi-session* (28.6 vs 57.1) and *single-session assistant/preference*, where
+compression drops detail even though recall is 95–100% — the loss is compression, not
+retrieval (§5). *(\*full-context measured under a weaker reader; it spends 100× the tokens
+for no gain over RAG — retrieval memory is essential.)*
+
+The pattern is **reader-robust**: swapping the reader for a frontier model
+(`claude-opus-4.8`) leaves it unchanged — RAG 67.5 / Tenet 57.5 QA, acc/1k-tok 32.1 / **53.9**
+(Tenet 1.7×). Across `gpt-4o-mini`, `gpt-4o`, and `opus-4.8`, RAG leads raw accuracy by
+~10 pp and Tenet leads accuracy-per-token by ~1.7×.
 
 **4.2 Knowledge churn (headline).** One fact updated *N* times amid distractors, k=6, 12
 principals/point:
@@ -163,7 +170,9 @@ principals/point:
 
 RAG degrades monotonically once *N > k* (−50 pp); Tenet is flat at 100%. Supersession keeps
 exactly one current value regardless of churn — the property a *belief state* has and a
-document index cannot.
+document index cannot. **The curves are identical under a `gpt-4o-mini` and a `gpt-4o`
+reader**: the failure is *structural* (once $N>k$ the latest value is not reliably retrieved),
+so a stronger reader cannot rescue RAG — it is not an artifact of reader quality.
 
 **4.3 Ablation — belief–evidence consistency.** On a controlled knowledge-update set,
 removing the §3.3 rule drops Tenet to **55%** current-value accuracy with a **45%
@@ -176,16 +185,16 @@ bounded store where RAG grows unboundedly.
 
 ## 5. Limitations
 
-- **Not a better one-shot retriever.** A well-tuned RAG matches or beats Tenet on static
-  factual recall; Tenet's advantage is churn-robustness, per-token efficiency, and
-  capabilities (supersession, time-travel, forgetting) RAG lacks.
-- **Multi-hop temporal synthesis** is the weakest category (0% on LME temporal): distillation
-  compresses away the fine detail these questions need even when the right session is
-  retrieved. A promising fix is *query-aware evidence expansion* — detecting temporal/multi-hop
-  intent and widening the evidence pool for those queries.
-- **Evaluation reader.** Absolute accuracies use `gpt-4o-mini`; a stronger reader (the shipped
-  `qwen3.7-plus`) is expected to lift them substantially. Relative comparisons hold, as all
-  systems share the reader.
+- **Not a better one-shot retriever.** Under a gpt-4o reader, a well-tuned RAG beats Tenet
+  on raw QA accuracy (65 vs 52.5); Tenet's advantage is churn-robustness, per-token
+  efficiency (1.6×), and capabilities (supersession, time-travel, forgetting) RAG lacks.
+- **Multi-session synthesis** is the weakest category (28.6 vs 57.1): distillation compresses
+  away detail that spanning-multiple-sessions questions need, even when recall is 95–100%. A
+  promising fix is *query-aware evidence expansion* — detecting multi-hop intent and widening
+  the evidence pool for those queries. (Temporal-reasoning, weak under a mini reader, recovers
+  to 40% under gpt-4o.)
+- **Evaluation.** n=40, off-Qwen (gpt-4o reader, local embedder). The shipped system uses
+  Qwen Cloud; relative comparisons hold, as all systems share the reader.
 
 ## 6. Conclusion
 

@@ -44,19 +44,21 @@ state** — a compact *world model of the user* — and stays correct where retr
 
 Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
 
-## Results (LongMemEval_S — honest, reproducible; full detail in [`docs/BENCHMARK.md`](docs/BENCHMARK.md))
+## Results (LongMemEval_S, n=40, gpt-4o reader — honest, reproducible; detail in [`docs/BENCHMARK.md`](docs/BENCHMARK.md))
 
 | | recall@10 | QA acc | reader tokens | **acc / 1k tok** |
 |---|---:|---:|---:|---:|
-| full-context | — | 65% | 123,773 | 0.5 |
-| RAG | 95% | 60% | 2,193 | 27.4 |
-| **Tenet** | **95%** | 45% | **1,092** | **41.2** ← best |
+| full-context | — | 65% | ~124,000 | 0.5 |
+| RAG | 95% | **65%** | 2,101 | 30.9 |
+| **Tenet** | **97.5%** | 52.5% | **1,067** | **49.2** ← best |
 
-- **Churn-robust:** 100% at every update level (RAG → 50%).
-- **Best accuracy-per-token** — half of RAG's context, 1/100th of full-context.
+- **Best accuracy-per-token** (1.6× RAG; half its context) — and **reader-robust**: with a
+  frontier reader (`claude-opus-4.8`) it's 1.7× (Tenet 53.9 vs RAG 32.1).
+- **Churn-robust:** 100% at every update level while RAG collapses to 50% — and the collapse
+  holds under a gpt-4o reader, so it's *structural*, not reader weakness.
 - **Ablation:** the belief–evidence consistency rule alone lifts current-value accuracy 55%→100%.
-- **Honest:** a strong RAG wins one-shot factual recall; multi-hop temporal is our weak spot.
-  We report it. *(Eval reader is `gpt-4o-mini` off-Qwen; shipped system uses Qwen Cloud.)*
+- **Honest:** a strong RAG wins raw one-shot accuracy (65 vs 52.5); Tenet's weak spot is
+  multi-session synthesis. We report it. *(Eval off-Qwen; shipped system uses Qwen Cloud.)*
 
 ## The agent
 

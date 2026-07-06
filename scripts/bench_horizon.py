@@ -33,7 +33,8 @@ def answer(context):
         [{"role": "system", "content": "Answer using ONLY the memory provided. Give the "
           "user's CURRENT city. Reply with just the city name."},
          {"role": "user", "content": f"Memory:\n{context}\n\nQuestion: {Q}"}],
-        qwen_default="qwen3.7-plus", max_tokens=16)
+        qwen_default="qwen3.7-plus", max_tokens=16,
+        or_model=config.get("READER_MODEL", "") or None)
 
 
 def one(principal, n_updates, k, n_distractors):

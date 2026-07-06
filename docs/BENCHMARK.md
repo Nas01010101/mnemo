@@ -4,9 +4,8 @@ Tenet is evaluated on the standard **LongMemEval_S** benchmark (500 questions,
 ~115k-token multi-session histories) plus controlled capability tests. Every number is
 **honest and reproducible** from `scripts/`. Where a strong baseline beats us, we say so.
 
-> **Off-Qwen validation protocol.** The Qwen free-trial quota was exhausted mid-evaluation,
-> so these runs use a local embedder (`bge-small-en-v1.5`) + `gpt-4o-mini` reader via
-> OpenRouter. This validates the **architecture** (Tenet vs baselines under identical
+> **Protocol.** A `gpt-4o` reader (the reader Mem0/Zep report against) + local embedder
+> (`bge-small-en-v1.5`) + cheap `gpt-4o-mini` distiller, via OpenRouter. This validates the **architecture** (Tenet vs baselines under identical
 > settings); the shipped product uses Qwen Cloud (`text-embedding-v4` + `qwen3.7-plus`)
 > via `config.py` — swap by env, no code change. Numbers are indicative, compared only
 > against baselines we run ourselves — never pasted onto the public gpt-4o leaderboard.
@@ -26,7 +25,7 @@ Session-level recall@10 over the full ~50-session haystack (n=20):
 | System | recall@10 |
 |---|---|
 | naive-RAG | 95% |
-| **Tenet** | **95%** |
+| **Tenet** | **97.5%** |
 
 Parity. (An earlier design scored 37% here; the hybrid index + stale-echo fixes below
 closed the gap.)
@@ -37,20 +36,20 @@ context** (LongMemEval-V2's accuracy/latency direction). n=20:
 
 | System | QA acc | reader tokens | **acc / 1k tokens** |
 |---|---:|---:|---:|
-| full-context (no memory) | 65% | 123,773 | 0.5 |
-| RAG @k=10 | 60% | 2,193 | 27.4 |
-| **Tenet** | 45% | **1,092** | **41.2** ← best |
+| full-context (no memory) | 65%* | ~124,000 | 0.5* |
+| RAG @k=10 | **65%** | 2,101 | 30.9 |
+| **Tenet** | 52.5% | **1,067** | **49.2** ← best |
 
 Tenet delivers the **highest accuracy per token** — half of RAG's context, 99% less than
-full history. On **raw** accuracy it trails RAG (45 vs 60); the gap is entirely in two
+full history. On **raw** accuracy a strong RAG wins (65 vs 52.5); the gap is in two
 categories:
 
 | question type | RAG QA | Tenet QA |
 |---|---|---|
 | single-session-user | 100% | 100% |
 | knowledge-update | 67% | 67% |
-| multi-session | 75% | 50% |
-| **temporal-reasoning** | 33% | **0%** |
+| multi-session | **57%** | 29% |
+| temporal-reasoning | 53% | 40% |
 
 Recall is 100% on those types (the evidence *is* retrieved) — Tenet's compressed context
 loses the fine detail multi-hop/temporal answers need. Honest limitation, §6.
@@ -94,10 +93,11 @@ core value directly.
 - **Not a better general retriever.** For one-shot factual retrieval, a well-tuned
   embedding RAG matches or beats Tenet on raw accuracy. Tenet's edge is efficiency
   (acc/token), long-horizon robustness, and capabilities RAG lacks.
-- **Multi-hop temporal synthesis** is Tenet's weakest category (0% on LME temporal) —
-  distillation compresses away the detail these need even though recall is 100%. Future
-  work: query-aware raw expansion for temporal questions.
-- QA numbers are off-Qwen (gpt-4o-mini reader); re-running on Qwen Cloud is a config flip.
+- **Multi-session synthesis** is Tenet's weakest category (29% vs RAG 57%) — distillation
+  compresses away detail spanning sessions even though recall is 95–100%. Future work:
+  query-aware evidence expansion. (Temporal recovers to 40% under gpt-4o.)
+- QA numbers are off-Qwen (gpt-4o/opus readers), n=40; robust across three readers. Shipped
+  system uses Qwen Cloud (config flip). Churn result is reader-robust (identical on gpt-4o).
 
 ## Reproduce
 ```bash

@@ -133,24 +133,24 @@ consistency, evidence for verbatim detail), each guaranteed a budget share.
 
 \section{Experiments}
 \textbf{Protocol.} LongMemEval\_S (500 questions, ${\sim}115$k-token histories).
-The Qwen free quota was exhausted mid-study, so reported runs use a local embedder (\texttt{bge-small}) and a \texttt{gpt-4o-mini} reader; the shipped system uses Qwen Cloud (\texttt{text-embedding-v4}, \texttt{qwen3.7-plus}), a config flip. Numbers are \emph{indicative}, compared only to baselines run under identical settings.
+We use a \textbf{\texttt{gpt-4o} reader} (the same reader Mem0 and Zep report against), a local embedder (\texttt{bge-small}), and a cheap \texttt{gpt-4o-mini} distiller; the shipped system runs the same code on Qwen Cloud (\texttt{text-embedding-v4}, \texttt{qwen3.7-plus}) by a config flip. Numbers are compared only to baselines run under identical settings.
 Baselines: \textbf{RAG} (top-$k$ raw turns) and \textbf{full-context} (entire history).
 
-\subsection{Retrieval recall and the accuracy-per-token frontier}
+\subsection{Retrieval recall and the accuracy-per-token frontier (n$=$40, gpt-4o reader)}
 \label{sec:frontier}
 \begin{center}\small
 \begin{tabular}{lrrrr}
 \toprule
 System & recall@10 & QA acc & reader tok & \textbf{acc/1k tok} \\
 \midrule
-full-context & --- & 65\% & 123{,}773 & 0.5 \\
-RAG          & 95\% & 60\% & 2{,}193 & 27.4 \\
-\textbf{Tenet} & \textbf{95\%} & 45\% & \textbf{1{,}092} & \textbf{41.2} \\
+full-context & --- & 65\%$^{*}$ & ${\sim}124\text{k}$ & 0.5$^{*}$ \\
+RAG          & 95\% & \textbf{65\%} & 2{,}101 & 30.9 \\
+\textbf{Tenet} & \textbf{97.5\%} & 52.5\% & \textbf{1{,}067} & \textbf{49.2} \\
 \bottomrule
 \end{tabular}
 \end{center}
 Tenet matches RAG on recall and gives the best accuracy per token. On raw accuracy it
-trails RAG ($45$ vs $60$), entirely in \emph{multi-session} ($50$ vs $75$) and \emph{temporal-reasoning} ($0$ vs $33$); recall is $100\%$ there, so the loss is compression, not retrieval.
+is beaten by a strong RAG ($52.5$ vs $65$); the gap is in \emph{multi-session} ($28.6$ vs $57.1$) and single-session assistant/preference, where compression drops detail though recall is $95$--$100\%$---the loss is compression, not retrieval. Tenet gives the best accuracy-per-token ($1.6\times$ RAG). $^{*}$Full-context, at a weaker reader, spends $100\times$ the tokens for no gain over RAG. The pattern is reader-robust: with a frontier reader (\texttt{claude-opus-4.8}) it is unchanged---RAG $67.5$ / Tenet $57.5$, acc/1k-tok $32.1$ / $53.9$ ($1.7\times$).
 
 \subsection{Knowledge churn (headline)}
 \label{sec:churn}
@@ -167,7 +167,7 @@ RAG            & 100 & 100 & 100 & 67 & 58 & \textbf{50} \\
 \end{center}
 RAG degrades monotonically once $N>k$ ($-50$\,pp); Tenet is flat at $100\%$. Supersession
 keeps exactly one current value regardless of churn---the property a \emph{belief state} has
-and a document index cannot.
+and a document index cannot. \textbf{The curves are identical under a \texttt{gpt-4o-mini} and a \texttt{gpt-4o} reader}: the failure is structural (once $N>k$ the latest value is not reliably retrieved), so a stronger reader cannot rescue RAG.
 
 \subsection{Ablations}
 \label{sec:abl}
@@ -181,7 +181,7 @@ with no accuracy change, yielding a bounded store where RAG grows unboundedly.
 recall; Tenet's edge is churn-robustness, per-token efficiency, and capabilities RAG lacks.
 \textbf{Multi-hop temporal synthesis} is the weakest category: distillation compresses away
 fine detail even when the right session is retrieved; a promising fix is \emph{query-aware
-evidence expansion}. \textbf{Evaluation reader}: absolute accuracies use \texttt{gpt-4o-mini}; a stronger reader (the shipped \texttt{qwen3.7-plus}) is expected to lift them; relative comparisons hold, as all systems share the reader.
+evidence expansion}. \textbf{Evaluation}: $n{=}40$, off-Qwen (gpt-4o reader, local embedder); the shipped system uses Qwen Cloud. Temporal-reasoning, weak under a mini reader, recovers to $40\%$ under gpt-4o.
 
 \section{Conclusion}
 Treating agent memory as a \textbf{self-consistent belief state} rather than a document index

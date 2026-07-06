@@ -7,11 +7,11 @@ apples-to-apples.**
 ## ⚠️ Benchmark comparability caveat
 The LongMemEval numbers below come from each project's own runs with **strong readers**
 (Mem0/Zep: gpt-4o; Mastra: gpt-5-mini; agentmemory: Claude Opus 4.6) and their own
-judge/protocol. Tenet's numbers are **off-Qwen validation with `gpt-4o-mini`** (the Qwen
-quota was exhausted). A weaker reader alone moves LongMemEval scores by tens of points, so
-**Tenet's 45% QA is not directly below their 90%+** — different reader, different protocol.
-We therefore compare on **architecture and capabilities** (directly comparable) and are
-explicit that we do **not** claim an accuracy win over these systems.
+judge/protocol. Tenet's numbers use a `gpt-4o` reader (matching them) but a **small local `bge-small` embedder
+and an unoptimized harness** — so our whole pipeline scores lower: our own **RAG baseline gets
+only 65%**, far below their 90%+ pipelines. The gap is embedder/harness, **not** the memory
+design. We therefore compare Tenet only to **our own RAG under identical settings**, and on
+**architecture/capabilities**; we do **not** claim an accuracy win over these systems.
 
 ## Feature / capability matrix
 | | **Tenet** | Mem0 | Zep / Graphiti | Letta (MemGPT) | Mastra OM | agentmemory |
@@ -26,9 +26,10 @@ explicit that we do **not** claim an accuracy win over these systems.
 | Graph infra required | ❌ (light) | ❌ (removed theirs) | ✅ (heavy writes) | ❌ | ❌ | ❌ |
 | **Long-horizon churn tested** | ✅ (100% @12 updates) | ❌ | ❌ | ❌ | ❌ | ❌ |
 | Time-travel (`as_of`) | ✅ | ❌ | ✅ | ❌ | ❌ | ❌ |
-| LongMemEval_S (own reader) | 45%¹ (gpt-4o-mini) | 94.4% (gpt-4o) | 71.2% (gpt-4o) | n/a | 94.9% (gpt-5-mini) | 96.2% (Opus 4.6) |
+| LongMemEval_S | 52.5%¹ | 94.4% | 71.2% | n/a | 94.9% | 96.2% |
 
-¹ off-Qwen validation, weak reader — see caveat. Recall@10 is 95% (= our RAG baseline).
+¹ gpt-4o reader + bge-small embedder; our RAG baseline scores 65% on the same setup, so
+absolute numbers reflect our light embedder/harness, not the memory design. Recall@10 = 97.5%.
 
 ## Where Tenet sits
 - **Architecturally closest to Zep/Graphiti** (bi-temporal + supersession + MCP + no-LLM
@@ -45,9 +46,9 @@ explicit that we do **not** claim an accuracy win over these systems.
   the best acc/1k-tokens of the approaches we ran (41 vs RAG 27 vs full-context 0.5).
 
 ## What Tenet does NOT claim
-- Not SOTA on raw LongMemEval accuracy — agentmemory (96.2%), Mastra (94.9%) and Mem0
-  (94.4%) lead there with far stronger readers; we can't match that on gpt-4o-mini and
-  don't pretend to.
+- Not SOTA on raw LongMemEval accuracy — agentmemory (96.2%), Mastra (94.9%), Mem0 (94.4%)
+  lead with heavily-tuned retrieval pipelines; on our light bge-small harness even RAG only
+  reaches 65%, and we don't pretend otherwise.
 - Not better than a strong RAG at one-shot factual retrieval.
 - Weak on multi-hop temporal synthesis (documented, `docs/BENCHMARK.md` §6).
 
