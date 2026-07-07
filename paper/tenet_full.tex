@@ -397,10 +397,28 @@ LLM consolidation (batched ADD/UPDATE against nearest neighbors~\cite{mem0}), a
 HippoRAG-v2-style graph (OpenIE triples, synonym edges, Personalized-PageRank blended
 with dense scores~\cite{hipporag2}), and MemAgent-style overwrite memory
 (question-conditioned rolling rewrite~\cite{memagent}). These are mechanism
-reproductions at matched backbone, not the authors' full systems; the run is in progress
-at the time of writing and the final table ships with the artifact repository. Interim
-results are consistent with the published pattern: no reproduced arm approaches
-ingestion-time supersession on conflict resolution.
+reproductions at matched backbone, not the authors' full systems. On the 6K+32K cells
+($n{=}200$ pooled per axis; MemAgent subsampled $n{=}25$ at 6K only, as it reads the
+full haystack per question):
+
+\begin{center}
+\small
+\begin{tabular}{lrrrrr}
+\toprule
+6K+32K pooled & \tenet{} & CAR & Mem0-style & HippoRAG-style & MemAgent-style\\
+\midrule
+SH & \textbf{90.0} \ci{85.1}{93.4} & 87.5 \ci{82.2}{91.4} & 81.0 & 66.0 & 44.0\\
+MH & \textbf{36.0} \ci{29.7}{42.9} & 33.0 \ci{26.9}{39.8} & 12.0 & 9.0 & 16.0\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\tenet{} leads every reproduced arm on both axes. CAR---the published-SOTA
+recipe---is closest (CIs overlap): ingestion-time supersession matches or beats the best
+assembly-time aggregation while doing the consistency work once at write time instead of
+at every read. Mem0-style consolidation holds up single-hop (81.0) but collapses
+multi-hop (12.0); the graph arm is limited by 7B-quality OpenIE (66.0/9.0); overwrite
+memory loses information by construction (44.0/16.0).
 
 \section{Discussion}
 \textbf{Where the belief state wins.} Both MAB competencies reward what supersession

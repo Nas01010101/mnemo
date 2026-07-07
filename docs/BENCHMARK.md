@@ -142,6 +142,33 @@ is a **local qwen2.5:7b** — a deliberately weak, laptop-class backbone.
 Reproduce: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local \
 python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic`
 
+### 6.1 Same-harness reproductions of four published methods (`scripts/bench_baselines.py`)
+To remove the backbone confound entirely, we reimplemented four published memory
+mechanisms as arms of the SAME harness — same local-7B reader, same embedder, same
+SubEM + official prompt, same questions (6K+32K cells, n=200/pooled cell; MemAgent
+subsampled n=25, 6K only — it reads the full haystack per question):
+
+| 6K+32K pooled | **Tenet** | CAR¹ | Mem0-style² | HippoRAG-v2-style³ | MemAgent-style⁴ |
+|---|---:|---:|---:|---:|---:|
+| SH | **90.0** [85.1, 93.4] | 87.5 [82.2, 91.4] | 81.0 | 66.0 | 44.0 (n=25) |
+| MH | **36.0** [29.7, 42.9] | 33.0 [26.9, 39.8] | 12.0 | 9.0 | 16.0 (n=25) |
+
+¹ candidate extraction + max(serial) aggregation (arXiv:2606.01435) · ² batched LLM
+ADD/UPDATE consolidation (arXiv:2504.19413) · ³ OpenIE triples + synonym graph +
+Personalized-PageRank blended with dense (arXiv:2502.14802) · ⁴ question-conditioned
+rolling overwrite memory (arXiv:2507.02259). Mechanism reproductions at matched
+backbone, not the authors' full systems.
+
+- **Tenet leads every arm on both axes.** CAR — the published-SOTA recipe — is closest
+  (87.5/33.0, CIs overlap); ingestion-time supersession matches or beats the best
+  assembly-time aggregation while doing the work once at write time instead of every read.
+- Mem0-style consolidation holds up on SH (81) but collapses multi-hop (12); the
+  graph arm suffers from 7B-quality OpenIE (66/9); overwrite memory loses information
+  by construction (44/16).
+
+Reproduce: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local \
+python scripts/bench_baselines.py --arms car,mem0,hipporag,memagent --cells sh_6k,mh_6k,sh_32k,mh_32k --qpc 100`
+
 ## 7. MAB Accurate-Retrieval — the second MAB competency (`scripts/bench_mab_ar.py`)
 MemoryAgentBench's other core competency: 22 long contexts (197K–534K tokens), four
 sub-benchmarks, ~2,000 questions. **Protocol-faithful per sub-benchmark**: RULER-QA
