@@ -58,6 +58,24 @@ def build_store(cache_id: str, chs: list[str]) -> tuple[Tenet, np.ndarray]:
     return m, mat
 
 
+# EventQA cells are MULTIPLE-CHOICE: the question lists candidate next events and
+# the gold is one of them verbatim — a free-form extraction reader paraphrases and
+# can never SubEM-match. The choice reader copies exactly one candidate.
+_CHOICE_PROMPT = (
+    "You are given the events of a story so far, a list of possible subsequent events, "
+    "and retrieved excerpts from the story. Using ONLY the excerpts, decide which "
+    "candidate event actually happens next.\n"
+    "Reply by COPYING exactly ONE event from the candidate list, verbatim, with no "
+    "other words.\n\n[Story excerpts]\n{pool}\n\n{question}\nNext event:")
+
+
+def answer_choice(pool: str, question: str) -> str:
+    import config as _c
+    return _c.chat(
+        [{"role": "user", "content": _CHOICE_PROMPT.format(pool=pool, question=question)}],
+        qwen_default=_c.get("QWEN_ANSWER_MODEL", "qwen3.7-plus"), max_tokens=96)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--cells", default="", help="comma list of source prefixes (default all)")
@@ -92,8 +110,9 @@ def main():
             hits = m.core.recall(q, k=args.k, expand=args.expand, hops=args.hops,
                                  char_budget=len(rag_pool))
             tenet_pool = "\n---\n".join(h.text for h in hits)
-            rp = answer_extract(rag_pool, q)
-            tp = answer_extract(tenet_pool, q)
+            read = answer_choice if source.startswith("eventqa") else answer_extract
+            rp = read(rag_pool, q)
+            tp = read(tenet_pool, q)
             if not rp.strip() or not tp.strip():
                 stats[3] += 1
                 continue
