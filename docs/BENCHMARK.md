@@ -18,7 +18,7 @@ Tenet is evaluated on the standard **LongMemEval_S** benchmark (500 questions,
 - **Dominates the long-horizon regime**: as a fact is updated many times, RAG collapses
   (100%→50%); **Tenet holds 100%**. This is the regime long-term memory is *for*.
 - **Honest weakness**: multi-session synthesis — the one category still behind RAG
-  (42.9 vs 57.1, up from 28.6). Documented in §6.
+  (42.9 vs 57.1, up from 28.6). Documented in §7.
 
 ## 1. Retrieval recall — LongMemEval_S (`scripts/lme_recall.py`)
 Session-level recall@10 over the full ~50-session haystack (n=40):
@@ -59,7 +59,7 @@ surfaced — brings raw accuracy to **parity with strong RAG at fewer tokens** (
 
 Tenet ≥ RAG on every type **except multi-session** (43 vs 57, up from 29 before expansion):
 these questions need several evidence sessions, but expansion only deepens the sessions the
-top-*k* already surfaced. Honest limitation, §6. On a cheaper `gpt-4o-mini` reader the parity
+top-*k* already surfaced. Honest limitation, §7. On a cheaper `gpt-4o-mini` reader the parity
 point edges ahead overall (Tenet 60.0 vs RAG 55.0). *(\*full-context under a weaker reader.)*
 
 ## 3. Long-horizon knowledge churn — where memory structurally wins (`scripts/bench_horizon.py`)
@@ -97,7 +97,52 @@ Supersession · time-travel (`recall(as_of=…)`) · forgetting sweep · context
 · distillation-driven consistent keys — all pass without any benchmark, demonstrating the
 core value directly.
 
-## 6. Honest limitations
+## 6. MAB FactConsolidation — the standardized supersession benchmark (`scripts/bench_factcon.py`)
+MemoryAgentBench (ICLR 2026, arXiv:2507.05257) FactConsolidation: serial-numbered facts
+with counterfactual updates; questions require the CURRENT value. Deterministic
+**SubEM** metric and the **official reader prompt**, both copied verbatim from the MAB
+repo. All 800 questions (100 × 8 cells), Wilson 95% CIs, 0 API-error exclusions.
+**Tenet's ingestion here is zero-LLM**: supersession keys are computed deterministically
+from the fact text (`--keys heuristic`), so ingestion costs embeddings only; the reader
+is a **local qwen2.5:7b** — a deliberately weak, laptop-class backbone.
+
+| cell | naive-RAG (control) | **Tenet** | published SOTA mini¹ | published gpt-4o¹ |
+|---|---:|---:|---:|---:|
+| SH 6K   | 36.0 | **89.0** [81.4, 93.7] | 71 | 99 |
+| SH 32K  | 50.0 | **91.0** [83.8, 95.2] | 78 | 92 |
+| SH 64K  | 52.0 | **85.0** [76.7, 90.7] | 81 | 95 |
+| SH 262K | 53.0 | **81.0** [72.2, 87.5] | 82 | 93 |
+| **SH pooled** | 47.8 | **86.5 [82.8, 89.5]** | **78.0** | 94.8 |
+| MH 6K   | 5.0 | **42.0** [32.8, 51.8] | 34 | 57 |
+| MH 32K  | 3.0 | **30.0** [21.9, 39.6] | 27 | 50 |
+| MH 64K  | 3.0 | **29.0** [21.0, 38.5] | 33 | 58 |
+| MH 262K | 7.0 | **20.0** [13.3, 28.9] | 27 | 41 |
+| **MH pooled** | 4.5 | **30.2 [26.0, 34.9]** | **30.2** | 51.5 |
+
+¹ arXiv:2606.01435 (May 2026), the current published SOTA — candidate extraction +
+`max(serial)` aggregation, gpt-4o-mini / gpt-4o backbones.
+
+- **Single-hop: 86.5% pooled — above the published mini-tier SOTA (78.0; our CI excludes
+  it) despite a weaker backbone**, and above every system in the original MAB table at
+  every length (all 22 ≤60%; Zep 7%, Mem0 18%, MemGPT 28%). Per-cell we lead at
+  6K/32K/64K; their mini edges 262K by 1 point.
+- **Multi-hop: 30.2% pooled — exactly ties the published mini-tier SOTA** (their CAR
+  pipeline), again on the weaker backbone; every original-table system is ≤7%.
+- **No length collapse:** SH stays ≥81% from 6K→262K (Mnemos, the only other
+  ingestion-time system reported, collapses 90→28). The store is conflict-resolved at
+  ingestion, so haystack size barely matters for single-hop.
+- **Mechanism, not reader:** the identical reader with naive-RAG memory scores 47.8/4.5.
+- Ablation: with LLM-distilled keys instead of heuristic ones, 6K cells score
+  similarly (88/40 in iteration runs) — the templated facts make deterministic keying
+  sufficient; distilled keys matter for free-form conversation instead.
+- Caveats: backbone is *below* the published mini tier (local 7B vs gpt-4o-mini API);
+  MH degrades with length (recall/chaining strain at 18k facts — 42→20) — both reported,
+  not hidden.
+
+Reproduce: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local \
+python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic`
+
+## 7. Honest limitations
 - **Multi-session synthesis** is the one category where RAG still leads (43% vs 57%).
   Belief-anchored expansion lifted it from 29% but doesn't close it: these questions need
   evidence from *several* sessions, and expansion only deepens the sessions the top-*k*

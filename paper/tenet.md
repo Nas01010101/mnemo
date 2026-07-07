@@ -70,6 +70,10 @@ take toward perception [Friston]; we bring it to agent memory.
    levels)**, on par with RAG on recall (95%), **best-in-class on accuracy-per-token**, and —
    with belief-anchored evidence expansion — **at parity with strong RAG on one-shot accuracy
    at equal token budget**, closing a gap earlier belief-only compression left open.
+4. On the standardized **MemoryAgentBench FactConsolidation** benchmark, ingestion-time
+   supersession with zero-LLM deterministic keys **exceeds the published single-hop SOTA at
+   the gpt-4o-mini tier (86.5 vs 78.0 pooled) and ties the multi-hop tier (30.2)** — using
+   only a local 7B backbone, where the original benchmark's 22 systems score ≤60 / ≤7.
 
 ## 2. Related work
 
@@ -81,9 +85,25 @@ is the standard long-horizon benchmark; its V2 [Wu 2026] adds a *latency-aware* 
 signalling a field shift toward accuracy *per cost*, which our per-token results target.
 
 **Temporal knowledge graphs.** Zep/Graphiti [Rasmussen 2025] maintain a *bi-temporal*
-knowledge graph (valid + transaction time) with automatic invalidation — the closest prior
-work to our belief model — but pay heavy per-write extraction and require graph
-infrastructure. Tenet keeps the bi-temporal semantics without the graph.
+knowledge graph (valid + transaction time) with automatic invalidation — but pay heavy
+per-write extraction and require graph infrastructure. Tenet keeps the bi-temporal
+semantics without the graph.
+
+**The 2026 bi-temporal convergence.** Concurrently with this work, several systems adopted
+bi-temporal supersession: MemStrata [MemStrata 2026] applies a deterministic
+(subject, relation, object) supersession rule over a bi-temporal ledger with no LLM in the
+read path — and shows *similarity-threshold* supersession leaks stale values where
+deterministic keying does not, independently corroborating our keyed design; Engram
+[Engram 2026] pairs a bi-temporal knowledge graph with a hybrid facts-plus-raw-chunks read
+path (converging on our dual-pool finding) and reaches 83.6% on LongMemEval_S under the
+official judge; TOKI [TOKI 2026] gives contradiction resolution a formal bitemporal
+operator algebra. On conflict-resolution benchmarks, [Freshness 2026] shows the assembly
+step dominates: deterministic max(serial) aggregation after retrieval sets the current
+SOTA on MemoryAgentBench FactConsolidation. Tenet differs from all of these in *where*
+consistency is enforced — at ingestion (the store never contains a stale current value)
+and at recall (belief–evidence consistency retires stale raw evidence) — and in coupling
+the belief state to a write policy (surprise gating) and a budget-bounded evidence
+expansion, evaluated on the knowledge-churn axis none of them report.
 
 **OS-style and observational memory.** MemGPT/Letta [Packer 2023] page memory between a
 context "RAM" and archival "disk", agent-managed. Mastra's Observational Memory maintains a
@@ -206,6 +226,23 @@ This is the single most important mechanism.
 discards **15% of observations** as redundant with **no accuracy change**, yielding a
 bounded store where RAG grows unboundedly.
 
+**4.5 Standardized conflict resolution — MemoryAgentBench FactConsolidation.** On the
+ICLR 2026 conflict-resolution benchmark [Hu 2026] (SubEM metric and official reader prompt
+verbatim; all 800 questions; Wilson 95% CIs), ingestion-time supersession with **fully
+deterministic, zero-LLM keys** and a deliberately weak **local 7B backbone** scores:
+
+| pooled (4 lengths, 6K–262K) | naive-RAG (same reader) | **Tenet** | published SOTA (mini / gpt-4o) [Freshness 2026] |
+|---|---:|---:|---:|
+| FC-SH (n=400) | 47.8 | **86.5** [82.8, 89.5] | 78.0 / 94.8 |
+| FC-MH (n=400) | 4.5 | **30.2** [26.0, 34.9] | 30.2 / 51.5 |
+
+Single-hop **exceeds the published gpt-4o-mini-tier SOTA (78.0; our CI excludes it) on a
+weaker backbone**, and every system in the original benchmark table scores ≤60 (Zep 7,
+Mem0 18, MemGPT 28); multi-hop exactly ties the mini-tier SOTA, where the original table's
+best is ≤7. Accuracy barely degrades with haystack length (SH 89→81 from 6K→262K) because
+the store is conflict-resolved at ingestion — the property assembly-time aggregation must
+re-derive at every read. Multi-hop still degrades with length (42→20); reported honestly.
+
 ## 5. Limitations
 
 - **Multi-session synthesis** is the one category where RAG still leads (42.9 vs 57.1).
@@ -239,6 +276,11 @@ belief-state view also yields time-travel and principled forgetting for free. We
 [Rasmussen 2025] Zep: A Temporal Knowledge Graph Architecture for Agent Memory. arXiv:2501.13956.
 [Packer 2023] MemGPT: Towards LLMs as Operating Systems. arXiv:2310.08560.
 [Xu 2025] A-MEM: Agentic Memory for LLM Agents. arXiv:2502.12110.
+[Hu 2026] MemoryAgentBench: Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions. arXiv:2507.05257 (ICLR 2026).
+[Freshness 2026] Don't Ask the LLM to Track Freshness: A Deterministic Recipe for Memory Conflict Resolution. arXiv:2606.01435.
+[MemStrata 2026] Temporal Validity in Retrieval Memory: Eliminating Stale-Fact Errors for AI Agents over Evolving Knowledge. arXiv:2606.26511.
+[Engram 2026] Less Context, More Accuracy: A Bi-Temporal Memory Engine for LLM Agents. arXiv:2606.09900.
+[TOKI 2026] TOKI: A Bitemporal Operator Algebra for Contradiction Resolution in LLM-Agent Persistent Memory. arXiv:2606.06240.
 [Friston] The free-energy principle: a unified brain theory? Nat. Rev. Neurosci., 2010.
 
 *Reproduce every number: see `docs/BENCHMARK.md` and `scripts/`.*

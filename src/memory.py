@@ -87,6 +87,10 @@ class MemoryCore:
                  archived INTEGER NOT NULL DEFAULT 0
                )"""
         )
+        # keyed-supersession lookups are per-insert; without this index they are
+        # full scans, which turns bulk ingestion (benchmarks: ~10k facts/sequence)
+        # into O(n^2). Harmless at conversation scale.
+        self.db.execute("CREATE INDEX IF NOT EXISTS idx_memories_skey ON memories(skey) ")
         self.db.commit()
         self._client = None
 

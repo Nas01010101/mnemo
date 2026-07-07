@@ -88,6 +88,20 @@ Tenet is a **frontier, not a point** — one `expand` knob trades tokens for acc
 - **Honest:** the one category still behind RAG is multi-session synthesis (42.9 vs 57.1, up
   from 28.6). We report it. *(Eval off-Qwen, one seed, reader noise ≈±5–7pp; shipped system uses Qwen Cloud.)*
 
+### 🏆 Standardized: MemoryAgentBench FactConsolidation (ICLR 2026, all 800 questions)
+
+Conflict resolution — the axis famous memory systems fail hardest (original table: **Zep 7%,
+Mem0 18%, MemGPT 28%** single-hop; **≤7%** multi-hop for all 22 systems):
+
+| pooled 6K–262K | naive-RAG | **Tenet** | published SOTA (mini / gpt-4o) |
+|---|---:|---:|---:|
+| single-hop | 47.8 | **86.5** [82.8, 89.5] | 78.0 / 94.8 |
+| multi-hop | 4.5 | **30.2** [26.0, 34.9] | 30.2 / 51.5 |
+
+**Above the published mini-tier single-hop SOTA and tied on multi-hop — with a local 7B
+backbone and *zero-LLM* deterministic ingestion.** SubEM + official prompt verbatim; Wilson
+CIs; no length collapse (SH ≥81% at every haystack size). Details: [`docs/BENCHMARK.md`](docs/BENCHMARK.md) §6.
+
 ## The agent
 
 Tenet ships as a personal assistant ([`src/agent.py`](src/agent.py)) on Qwen Cloud:

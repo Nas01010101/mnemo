@@ -70,7 +70,7 @@ _local_embedder = None
 
 
 def chat_client():
-    """OpenAI-compatible chat client for the active provider (qwen | openrouter)."""
+    """OpenAI-compatible chat client for the active provider (qwen | openrouter | ollama)."""
     global _or_client
     if LLM_PROVIDER == "openrouter":
         if _or_client is None:
@@ -78,12 +78,29 @@ def chat_client():
             _or_client = OpenAI(api_key=require("OPENROUTER_API_KEY"),
                                 base_url=get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"))
         return _or_client
+    if LLM_PROVIDER == "ollama":
+        return ollama_client()
     return qwen_client()
 
 
+def ollama_client():
+    """OpenAI SDK client pointed at a local/remote ollama server (Qwen runs local —
+    quota-proof). OLLAMA_BASE_URL may point at a GPU box (e.g. the RTX over Tailscale)."""
+    from openai import OpenAI
+    return OpenAI(api_key="ollama",
+                  base_url=get("OLLAMA_BASE_URL", "http://localhost:11434/v1"))
+
+
+OLLAMA_MODEL = get("OLLAMA_MODEL", "qwen2.5:14b")
+
+
 def chat_model(qwen_default: str) -> str:
-    """Model id for the active provider; OpenRouter uses one configured model."""
-    return OPENROUTER_MODEL if LLM_PROVIDER == "openrouter" else qwen_default
+    """Model id for the active provider; OpenRouter/ollama use one configured model."""
+    if LLM_PROVIDER == "openrouter":
+        return OPENROUTER_MODEL
+    if LLM_PROVIDER == "ollama":
+        return OLLAMA_MODEL
+    return qwen_default
 
 
 def chat(messages, *, qwen_default: str, max_tokens: int = 512, temperature: float = 0,
@@ -145,26 +162,26 @@ def embed_texts(texts: list[str]):
             _local_embedder = SentenceTransformer(LOCAL_EMBED_MODEL)
         vecs = _local_embedder.encode(texts, normalize_embeddings=True, show_progress_bar=False)
         return [np.asarray(v, dtype=np.float32) for v in vecs]
-    # Qwen/DashScope — batched (cap 10/call), truncate long inputs, per-item fallback
+    # Qwen/DashScope — batched (cap 10/call), truncate long inputs. A failed embedding
+    # RAISES after backoff: a zero/garbage vector silently destroys recall (a 2.6h run
+    # once scored 5% because rate-limit failures became zero vectors — never again).
+    import time as _t
     client = qwen_client()
     clipped = [t[:6000] for t in texts]
     out = []
     for i in range(0, len(clipped), 10):
         chunk = clipped[i:i + 10]
-        try:
-            data = client.embeddings.create(model=QWEN_EMBED_MODEL, input=chunk).data
-            vecs = [d.embedding for d in data]
-        except Exception:
-            vecs = []
-            for one in chunk:
-                try:
-                    vecs.append(client.embeddings.create(model=QWEN_EMBED_MODEL, input=one).data[0].embedding)
-                except Exception:
-                    vecs.append(None)
+        vecs = None
+        for attempt in range(6):
+            try:
+                data = client.embeddings.create(model=QWEN_EMBED_MODEL, input=chunk).data
+                vecs = [d.embedding for d in data]
+                break
+            except Exception as e:  # noqa: BLE001
+                if attempt == 5:
+                    raise RuntimeError(f"embedding failed after retries: {e}") from e
+                _t.sleep(min(2 ** attempt, 30))
         for v in vecs:
-            if v is None:
-                out.append(np.zeros(384 if EMBED_PROVIDER == "local" else 1024, dtype=np.float32))
-                continue
             a = np.asarray(v, dtype=np.float32)
             n = np.linalg.norm(a)
             out.append(a / n if n else a)
