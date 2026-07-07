@@ -81,9 +81,25 @@ is the standard long-horizon benchmark; its V2 [Wu 2026] adds a *latency-aware* 
 signalling a field shift toward accuracy *per cost*, which our per-token results target.
 
 **Temporal knowledge graphs.** Zep/Graphiti [Rasmussen 2025] maintain a *bi-temporal*
-knowledge graph (valid + transaction time) with automatic invalidation — the closest prior
-work to our belief model — but pay heavy per-write extraction and require graph
-infrastructure. Tenet keeps the bi-temporal semantics without the graph.
+knowledge graph (valid + transaction time) with automatic invalidation — but pay heavy
+per-write extraction and require graph infrastructure. Tenet keeps the bi-temporal
+semantics without the graph.
+
+**The 2026 bi-temporal convergence.** Concurrently with this work, several systems adopted
+bi-temporal supersession: MemStrata [MemStrata 2026] applies a deterministic
+(subject, relation, object) supersession rule over a bi-temporal ledger with no LLM in the
+read path — and shows *similarity-threshold* supersession leaks stale values where
+deterministic keying does not, independently corroborating our keyed design; Engram
+[Engram 2026] pairs a bi-temporal knowledge graph with a hybrid facts-plus-raw-chunks read
+path (converging on our dual-pool finding) and reaches 83.6% on LongMemEval_S under the
+official judge; TOKI [TOKI 2026] gives contradiction resolution a formal bitemporal
+operator algebra. On conflict-resolution benchmarks, [Freshness 2026] shows the assembly
+step dominates: deterministic max(serial) aggregation after retrieval sets the current
+SOTA on MemoryAgentBench FactConsolidation. Tenet differs from all of these in *where*
+consistency is enforced — at ingestion (the store never contains a stale current value)
+and at recall (belief–evidence consistency retires stale raw evidence) — and in coupling
+the belief state to a write policy (surprise gating) and a budget-bounded evidence
+expansion, evaluated on the knowledge-churn axis none of them report.
 
 **OS-style and observational memory.** MemGPT/Letta [Packer 2023] page memory between a
 context "RAM" and archival "disk", agent-managed. Mastra's Observational Memory maintains a
@@ -239,6 +255,11 @@ belief-state view also yields time-travel and principled forgetting for free. We
 [Rasmussen 2025] Zep: A Temporal Knowledge Graph Architecture for Agent Memory. arXiv:2501.13956.
 [Packer 2023] MemGPT: Towards LLMs as Operating Systems. arXiv:2310.08560.
 [Xu 2025] A-MEM: Agentic Memory for LLM Agents. arXiv:2502.12110.
+[Hu 2026] MemoryAgentBench: Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions. arXiv:2507.05257 (ICLR 2026).
+[Freshness 2026] Don't Ask the LLM to Track Freshness: A Deterministic Recipe for Memory Conflict Resolution. arXiv:2606.01435.
+[MemStrata 2026] Temporal Validity in Retrieval Memory: Eliminating Stale-Fact Errors for AI Agents over Evolving Knowledge. arXiv:2606.26511.
+[Engram 2026] Less Context, More Accuracy: A Bi-Temporal Memory Engine for LLM Agents. arXiv:2606.09900.
+[TOKI 2026] TOKI: A Bitemporal Operator Algebra for Contradiction Resolution in LLM-Agent Persistent Memory. arXiv:2606.06240.
 [Friston] The free-energy principle: a unified brain theory? Nat. Rev. Neurosci., 2010.
 
 *Reproduce every number: see `docs/BENCHMARK.md` and `scripts/`.*

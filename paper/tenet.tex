@@ -87,8 +87,20 @@ weigh in choosing a light substrate. LongMemEval~\cite{longmemeval} is the stand
 long-horizon benchmark; its V2 adds a \emph{latency-aware} metric, a field shift toward
 accuracy \emph{per cost} that our per-token results target.
 \textbf{Temporal knowledge graphs.} Zep/Graphiti~\cite{zep} maintain a bi-temporal graph
-with automatic invalidation---the closest prior work---but pay heavy per-write extraction
+with automatic invalidation---but pay heavy per-write extraction
 and require graph infrastructure; Tenet keeps the bi-temporal semantics without the graph.
+\textbf{The 2026 bi-temporal convergence.} Concurrent systems adopted bi-temporal
+supersession: MemStrata~\cite{memstrata} applies deterministic $(s,r,o)$ supersession over
+a bi-temporal ledger with no LLM on the read path---and shows \emph{similarity-threshold}
+supersession leaks stale values where deterministic keying does not, independently
+corroborating our keyed design; Engram~\cite{engram} pairs a bi-temporal graph with a
+hybrid facts-plus-chunks read path (converging on our dual-pool finding);
+TOKI~\cite{toki} formalizes contradiction resolution as a bitemporal operator algebra;
+and \cite{freshness} sets the current MemoryAgentBench FactConsolidation SOTA with
+deterministic post-retrieval aggregation. Tenet differs in \emph{where} consistency is
+enforced---at ingestion and at recall (belief--evidence consistency)---and in coupling the
+belief state to surprise-gated writes and budget-bounded evidence expansion, evaluated on
+the knowledge-churn axis none of them report.
 \textbf{OS-style / observational memory.} MemGPT/Letta~\cite{memgpt} page memory between
 context and archival storage; observational schemes keep a stable summary. Both are largely
 append-oriented and do not treat supersession or forgetting as first-class.
@@ -229,6 +241,11 @@ evaluating agent memory.
 \bibitem{longmemeval} Wu et al. \emph{LongMemEval: Benchmarking Chat Assistants on Long-Term Interactive Memory}. arXiv:2410.10813, 2024.
 \bibitem{zep} Rasmussen et al. \emph{Zep: A Temporal Knowledge Graph Architecture for Agent Memory}. arXiv:2501.13956, 2025.
 \bibitem{memgpt} Packer et al. \emph{MemGPT: Towards LLMs as Operating Systems}. arXiv:2310.08560, 2023.
+\bibitem{mab} Hu, Wang, McAuley. \emph{MemoryAgentBench: Evaluating Memory in LLM Agents via Incremental Multi-Turn Interactions}. arXiv:2507.05257, ICLR 2026.
+\bibitem{freshness} \emph{Don't Ask the LLM to Track Freshness: A Deterministic Recipe for Memory Conflict Resolution}. arXiv:2606.01435, 2026.
+\bibitem{memstrata} \emph{Temporal Validity in Retrieval Memory: Eliminating Stale-Fact Errors for AI Agents over Evolving Knowledge}. arXiv:2606.26511, 2026.
+\bibitem{engram} \emph{Less Context, More Accuracy: A Bi-Temporal Memory Engine for LLM Agents}. arXiv:2606.09900, 2026.
+\bibitem{toki} \emph{TOKI: A Bitemporal Operator Algebra for Contradiction Resolution in LLM-Agent Persistent Memory}. arXiv:2606.06240, 2026.
 \bibitem{friston} Friston. \emph{The free-energy principle: a unified brain theory?} Nat.\ Rev.\ Neurosci., 2010.
 \end{thebibliography}
 
