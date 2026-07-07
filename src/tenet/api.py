@@ -3,14 +3,14 @@
 This is the surface judges can `curl`, and the process shown running on Alibaba
 Cloud for the mandatory proof-of-deployment. Same MemoryCore as the MCP server.
 
-Run locally:  uvicorn api:app --host 0.0.0.0 --port 8000  (from src/)
+Run locally:  uvicorn tenet.api:app --host 0.0.0.0 --port 8000  (needs the `api` extra)
 """
 from __future__ import annotations
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
-from tenet import Tenet
+from .core import Tenet
 
 app = FastAPI(
     title="Tenet — Self-Managing Memory API",
@@ -20,7 +20,7 @@ app = FastAPI(
 _tenet = Tenet()
 _core = _tenet.core
 
-from agent import MemoryAgent  # noqa: E402
+from .agent import MemoryAgent  # noqa: E402
 _agent = MemoryAgent()
 _agent.m = _tenet  # the assistant shares the one memory store
 

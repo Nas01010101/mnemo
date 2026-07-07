@@ -1,16 +1,16 @@
 """Tenet MCP server — exposes the self-managing memory core as MCP tools so any
 MCP client (Claude Desktop, IDEs, other agents) gains persistent memory.
 
-Run (stdio):   python src/mcp_server.py
+Run (stdio):   tenet-mcp   (console script, after `pip install tenet-memory[mcp]`)
+                or: python -m tenet.mcp_server
 Claude Desktop config:
-    { "mcpServers": { "tenet": { "command": "python",
-        "args": ["/ABS/PATH/qwen-hackathon/src/mcp_server.py"] } } }
+    { "mcpServers": { "tenet": { "command": "tenet-mcp" } } }
 """
 from __future__ import annotations
 
 from mcp.server.fastmcp import FastMCP
 
-from tenet import Tenet
+from .core import Tenet
 
 mcp = FastMCP("tenet")
 _tenet = Tenet()
@@ -65,5 +65,9 @@ def memory_stats() -> str:
     return f"current={st['current']} superseded={st['superseded']} archived={st['archived']}"
 
 
-if __name__ == "__main__":
+def main():
     mcp.run()
+
+
+if __name__ == "__main__":
+    main()

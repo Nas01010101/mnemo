@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import numpy as np  # noqa: E402
-import config       # noqa: E402
+from tenet import config  # noqa: E402
 from tenet import Tenet  # noqa: E402
 
 CACHE = Path(__file__).resolve().parent.parent / "data" / "cache" / "factcon"

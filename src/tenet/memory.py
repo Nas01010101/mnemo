@@ -26,9 +26,9 @@ from pathlib import Path
 
 import numpy as np
 
-import config
+from . import config
 
-_DEFAULT_DB = Path(__file__).resolve().parent.parent / "data" / "tenet.db"
+_DEFAULT_DB = Path(__file__).resolve().parent.parent.parent / "data" / "tenet.db"
 
 # Forgetting knobs
 _HALFLIFE_S = 14 * 24 * 3600  # a memory's recency weight halves every 14 days

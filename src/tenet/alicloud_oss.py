@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import config
+from . import config
 
 
 def _bucket():

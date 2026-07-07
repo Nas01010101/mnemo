@@ -1,4 +1,4 @@
-"""Central, fail-loud config loader for qwen-hackathon.
+"""Central, fail-loud config loader for tenet.
 
 Reads the gitignored `.env`. Nothing else in the codebase should read os.environ
 for secrets directly — import from here so a missing key fails once, clearly.
@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-_ROOT = Path(__file__).resolve().parent.parent
+_ROOT = Path(__file__).resolve().parent.parent.parent
 _ENV = _ROOT / ".env"
 
 

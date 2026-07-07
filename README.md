@@ -21,8 +21,20 @@
 [![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](src/mcp_server.py)
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
 
-*A memory that stays true as the world changes.* Built for the
-[Global AI Hackathon with Qwen Cloud](https://qwencloud-hackathon.devpost.com) — **Track 1: MemoryAgent**.
+*A memory that stays true as the world changes.*
+
+```bash
+pip install tenet-memory
+```
+```python
+from tenet import Tenet
+
+mem = Tenet()
+mem.ingest("I live in Boston")
+mem.ingest("I moved to Seattle")            # supersedes — Boston kept in history
+mem.recall("where do I live?")              # → [Seattle]  (current beliefs, no LLM call)
+mem.recall("where do I live?", as_of=t0)    # → [Boston]   (time-travel)
+```
 
 </div>
 
@@ -126,12 +138,20 @@ python scripts/demo_agent.py   # the scripted story (video walkthrough)
 ```
 
 ## Quickstart
+
+```bash
+pip install tenet-memory                    # library: from tenet import Tenet
+```
+
+More in [`examples/`](examples/) — quickstart, assistant loop, MCP client, LangChain adapter.
+
+Running from source (full assistant + surfaces):
 ```bash
 cp .env.example .env && chmod 600 .env      # add DASHSCOPE_API_KEY (Qwen Cloud)
-pip install -r requirements.txt
+pip install -e .
 python scripts/smoke_test.py                # verify connectivity
 uvicorn api:app --host 0.0.0.0 --port 8000  # (from src/) HTTP API incl. POST /chat
-python src/mcp_server.py                     # or the MCP server (learn/recall/forget/stats)
+python -m tenet.mcp_server                   # or the MCP server (learn/recall/forget/stats)
 ```
 
 ## Reproduce the paper
@@ -173,6 +193,10 @@ docs/ BENCHMARK.md COMPARISON.md DESIGN.md DEPLOY.md SOTA.md  architecture.svg h
   url    = {https://github.com/Nas01010101/tenet}
 }
 ```
+
+## Origin
+Tenet started as a [Global AI Hackathon with Qwen Cloud](https://qwencloud-hackathon.devpost.com)
+(Track 1: MemoryAgent) entry — hackathon materials live in [`docs/hackathon/`](docs/hackathon/).
 
 ## License
 MIT — see [LICENSE](LICENSE).

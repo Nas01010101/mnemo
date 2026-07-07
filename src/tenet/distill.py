@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 
-import config
+from . import config
 
 _MODEL = config.get("QWEN_DISTILL_MODEL", "qwen3.6-flash")
 

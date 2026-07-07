@@ -8,7 +8,7 @@ import sys, tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-from agent import MemoryAgent  # noqa: E402
+from tenet.agent import MemoryAgent  # noqa: E402
 
 clock = {"t": 1_000_000.0}
 def now(): return clock["t"]

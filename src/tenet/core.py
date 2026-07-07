@@ -12,8 +12,8 @@ from __future__ import annotations
 
 import time
 
-from distill import distill
-from memory import Memory, MemoryCore
+from .distill import distill
+from .memory import Memory, MemoryCore
 
 
 class Tenet:

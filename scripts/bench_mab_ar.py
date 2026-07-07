@@ -22,7 +22,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import numpy as np  # noqa: E402
-import config       # noqa: E402
+from tenet import config  # noqa: E402
 from tenet import Tenet  # noqa: E402
 from bench_factcon import subem_max, wilson_ci, answer_extract  # noqa: E402
 

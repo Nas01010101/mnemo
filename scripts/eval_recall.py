@@ -15,7 +15,7 @@ import sys, tempfile, time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
-import memory as M  # noqa: E402
+from tenet import memory as M  # noqa: E402
 
 clock = {"t": 1_000_000.0}
 def now(): return clock["t"]

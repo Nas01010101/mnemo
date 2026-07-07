@@ -2,17 +2,17 @@
 
 A conversational assistant that remembers you across sessions, stays correct when your
 facts CHANGE (supersession), can recall what you *used* to say (time-travel), and forgets
-stale trivia. This is the agent Track 1 asks for; Tenet (src/tenet.py) is its memory.
+stale trivia. This is the agent Track 1 asks for; Tenet (tenet/core.py) is its memory.
 
-Run the interactive assistant:   python src/agent.py
+Run the interactive assistant:   python -m tenet.agent   (or the `tenet-agent` console script)
 Powered by Qwen Cloud (config.py provider layer).
 """
 from __future__ import annotations
 
 import time
 
-import config
-from tenet import Tenet
+from . import config
+from .core import Tenet
 
 _SYS = """You are a warm, concise personal assistant with long-term memory of the user.
 Use ONLY the remembered facts below to personalise your reply; never invent facts about
