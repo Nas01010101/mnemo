@@ -58,6 +58,46 @@ def build_store(cache_id: str, chs: list[str]) -> tuple[Tenet, np.ndarray]:
     return m, mat
 
 
+# MAB's official metric for the longmemeval cells is LLM-as-judge (paper: gpt-4o),
+# NOT SubEM — the anscheck prompts below are copied VERBATIM from the MAB repo
+# (llm_based_eval/longmem_qa_evaluate.py, get_anscheck_prompt). Judge model comes
+# from QWEN_JUDGE_MODEL (default qwen-max, DashScope) — labeled wherever reported.
+_ANSCHECK = {
+    "default": "I will give you a question, a correct answer, and a response from a model. Please answer yes if the response contains the correct answer. Otherwise, answer no. If the response is equivalent to the correct answer or contains all the intermediate steps to get the correct answer, you should also answer yes. If the response only contains a subset of the information required by the answer, answer no. \n\nQuestion: {}\n\nCorrect Answer: {}\n\nModel Response: {}\n\nIs the model response correct? Answer yes or no only.",
+    "temporal-reasoning": "I will give you a question, a correct answer, and a response from a model. Please answer yes if the response contains the correct answer. Otherwise, answer no. If the response is equivalent to the correct answer or contains all the intermediate steps to get the correct answer, you should also answer yes. If the response only contains a subset of the information required by the answer, answer no. In addition, do not penalize off-by-one errors for the number of days. If the question asks for the number of days/weeks/months, etc., and the model makes off-by-one errors (e.g., predicting 19 days when the answer is 18), the model's response is still correct. \n\nQuestion: {}\n\nCorrect Answer: {}\n\nModel Response: {}\n\nIs the model response correct? Answer yes or no only.",
+    "knowledge-update": "I will give you a question, a correct answer, and a response from a model. Please answer yes if the response contains the correct answer. Otherwise, answer no. If the response contains some previous information along with an updated answer, the response should be considered as correct as long as the updated answer is the required answer.\n\nQuestion: {}\n\nCorrect Answer: {}\n\nModel Response: {}\n\nIs the model response correct? Answer yes or no only.",
+    "single-session-preference": "I will give you a question, a rubric for desired personalized response, and a response from a model. Please answer yes if the response satisfies the desired response. Otherwise, answer no. The model does not need to reflect all the points in the rubric. The response is correct as long as it recalls and utilizes the user's personal information correctly.\n\nQuestion: {}\n\nRubric: {}\n\nModel Response: {}\n\nIs the model response correct? Answer yes or no only.",
+    "abstention": "I will give you an unanswerable question, an explanation, and a response from a model. Please answer yes if the model correctly identifies the question as unanswerable. The model could say that the information is incomplete, or some other information is given but the asked information is not.\n\nQuestion: {}\n\nExplanation: {}\n\nModel Response: {}\n\nDoes the model correctly identify the question as unanswerable? Answer yes or no only.",
+}
+
+_judge_client = None
+
+
+def judge_correct(question: str, gold, pred: str, qtype: str, abstention: bool) -> bool | None:
+    """Official MAB judge. Returns None on judge API failure (caller excludes)."""
+    global _judge_client
+    if _judge_client is None:
+        import os
+        from openai import OpenAI
+        _judge_client = OpenAI(api_key=os.environ["DASHSCOPE_API_KEY"],
+                               base_url="https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
+    g = gold[0] if isinstance(gold, list) else gold
+    tpl = _ANSCHECK["abstention"] if abstention else _ANSCHECK.get(qtype, _ANSCHECK["default"])
+    import os
+    for _ in range(4):
+        try:
+            r = _judge_client.chat.completions.create(
+                model=os.environ.get("QWEN_JUDGE_MODEL", "qwen-max"),
+                messages=[{"role": "user", "content": tpl.format(question, g, pred)}],
+                max_tokens=5, temperature=0)
+            out = (r.choices[0].message.content or "").strip().lower()
+            if out.startswith(("yes", "no")):
+                return out.startswith("yes")
+        except Exception:
+            time.sleep(3)
+    return None
+
+
 # EventQA cells are MULTIPLE-CHOICE: the question lists candidate next events and
 # the gold is one of them verbatim — a free-form extraction reader paraphrases and
 # can never SubEM-match. The choice reader copies exactly one candidate.
@@ -84,6 +124,10 @@ def main():
     ap.add_argument("--hops", type=int, default=2)
     ap.add_argument("--expand", type=int, default=20)
     ap.add_argument("--dump", default="")
+    ap.add_argument("--judge", action="store_true",
+                    help="score longmemeval cells with MAB's official LLM-judge "
+                         "(anscheck prompts verbatim; QWEN_JUDGE_MODEL, default qwen-max) "
+                         "instead of SubEM — the paper's own metric for those cells")
     args = ap.parse_args()
 
     from datasets import load_dataset
@@ -103,6 +147,9 @@ def main():
         m, mat = build_store(cache_id, chs)
 
         stats = per_cell.setdefault(source, [0, 0, 0, 0])  # rag_ok, tenet_ok, n, err
+        use_judge = args.judge and source.startswith("longmemeval")
+        qtypes = ex["metadata"].get("question_types") or [""] * len(ex["questions"])
+        qids = ex["metadata"].get("question_ids") or [""] * len(ex["questions"])
         for qi, (q, gold) in enumerate(list(zip(ex["questions"], ex["answers"]))[: args.qpc]):
             qv = np.asarray(m.core.embed_batch([q])[0])
             top = sorted(np.argsort(-(mat @ qv))[: args.k])
@@ -116,7 +163,15 @@ def main():
             if not rp.strip() or not tp.strip():
                 stats[3] += 1
                 continue
-            r_ok, t_ok = subem_max(rp, gold), subem_max(tp, gold)
+            if use_judge:
+                qt, ab = qtypes[qi], str(qids[qi]).endswith("_abs")
+                r_ok = judge_correct(q, gold, rp, qt, ab)
+                t_ok = judge_correct(q, gold, tp, qt, ab)
+                if r_ok is None or t_ok is None:   # judge failure: excluded, never scored
+                    stats[3] += 1
+                    continue
+            else:
+                r_ok, t_ok = subem_max(rp, gold), subem_max(tp, gold)
             stats[0] += r_ok; stats[1] += t_ok; stats[2] += 1
             if dump_f and not (r_ok and t_ok):
                 dump_f.write(json.dumps({"cell": source, "q": q[:300], "gold": gold,
