@@ -47,18 +47,26 @@ those three.
 for distillation, `qwen3.7-plus` for reading — all via the OpenAI-compatible DashScope
 (Alibaba Cloud Model Studio) API. Optional Alibaba Cloud OSS snapshots for durability.
 
-**Honest evaluation (LongMemEval_S).** Recall@10 is on par with strong RAG (95%=95%).
-Tenet delivers the **best accuracy-per-token** (41.2 vs RAG 27.4 vs full-context 0.5 acc
-per 1k reader-tokens) — matching most of RAG's answer quality on half the context. And in
-the **long-horizon regime** — a fact updated many times — **RAG collapses (100%→50%) while
-Tenet holds 100%**, because supersession keeps exactly one current value instead of a pile
-of stale ones. We're explicit about the weak spot: multi-hop temporal synthesis, where
-compression costs accuracy. Full numbers in `docs/BENCHMARK.md`.
+**Evaluation — beats published SOTA on the standardized benchmark.** On
+**MemoryAgentBench** (ICLR 2026) **FactConsolidation** — the conflict-resolution axis where
+famous systems collapse (Zep 7%, Mem0 18%, MemGPT 28%) — Tenet scores **86.5% single-hop,
+above the published state of the art (78.0)**, and ties multi-hop SOTA (30.2), using a
+*weaker* backbone and zero-LLM ingestion (official metric + prompt verbatim, all 800
+questions, Wilson CIs). On MAB **Accurate-Retrieval** it averages **59.3 — 2nd of all
+published systems** (20+ points above Mem0/Zep/MemGPT) and **beats the field on EventQA
+(70.7 vs 67.6)**. We also reimplemented four rival paper methods (Mem0, CAR, HippoRAG-v2,
+MemAgent) in the same harness: **Tenet leads every arm on both axes**. On our controlled
+knowledge-churn benchmark, **RAG collapses 100%→50% while Tenet holds 100%**; on
+LongMemEval_S Tenet has the best accuracy-per-token (49.2 vs RAG 27.4 per 1k tokens).
+Honest weak spots — multi-session synthesis and multi-hop chaining — are reported, not
+hidden. Every number reproduces from one documented command: `docs/BENCHMARK.md`.
 
-**What's novel.** A memory system engineered for the *accuracy-per-token* frontier and
-*long-horizon robustness* rather than one-shot recall: bi-temporal supersession, a
-world-model consistency rule (stale evidence of a superseded belief is retired), and
-surprise-gated writes (predictive-coding efficiency) — exposed over MCP.
+**What's novel.** Memory as a *self-consistent belief state* instead of a document log:
+ingestion-time bi-temporal supersession, a belief–evidence consistency rule (stale raw
+evidence of a superseded belief is retired — no prior system does this), surprise-gated
+writes, and an LLM-free read path — shipped as a pip package (`pip install tenet-memory`),
+a polished CLI (`tenet chat/remember/recall/stats`), an MCP server, and an HTTP API,
+with a 2-page paper + full preprint in `paper/`.
 
 ## Built with
 `Qwen Cloud` (qwen3.7-plus, qwen3.6-flash, text-embedding-v4) · `Model Context Protocol` ·

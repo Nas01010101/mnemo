@@ -53,8 +53,8 @@ The three things Track 1 explicitly asks for, and how we answer each:
 
 ## Deploy target (satisfies mandatory proof-of-deploy)
 FastAPI backend on **Alibaba Cloud** — Function Compute (serverless, simplest) or a small
-ECS instance. The `store`/`recall` endpoints run there; a `src/alicloud_*.py` file will
-be the linkable "code file that uses Alibaba Cloud services/APIs".
+ECS instance. The `store`/`recall` endpoints run there; [`src/tenet/alicloud_oss.py`](../src/tenet/alicloud_oss.py)
+is the linkable "code file that uses Alibaba Cloud services/APIs".
 
 ## Scope for 4 days (ponytail — least code that wins)
 1. `MemoryCore` — embed, store, semantic recall, decay/forget. **(core, day 1)**

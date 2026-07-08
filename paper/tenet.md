@@ -252,6 +252,14 @@ best is ≤7. Accuracy barely degrades with haystack length (SH 89→81 from 6K�
 the store is conflict-resolved at ingestion — the property assembly-time aggregation must
 re-derive at every read. Multi-hop still degrades with length (42→20); reported honestly.
 
+To remove the backbone confound entirely, we reimplemented four published memory
+mechanisms as arms of the *same* harness (same 7B reader, embedder, SubEM, prompt;
+6K+32K cells, n=200/axis): CAR [Freshness 2026] 87.5 SH / 33.0 MH, Mem0-style
+consolidation 81.0 / 12.0, HippoRAG-v2-style OpenIE+PPR graph 66.0 / 9.0,
+MemAgent-style overwrite memory 44.0 / 16.0 (n=25). **Tenet leads every arm on both
+axes (90.0 / 36.0 on the same cells)** — ingestion-time supersession matches or beats
+the best assembly-time aggregation while doing the consistency work once at write time.
+
 **4.6 Accurate retrieval at zero ingestion cost — MemoryAgentBench AR.** On MAB's other
 core competency (~2,000 questions, 197K–534K-token contexts; official per-benchmark
 metrics: SubEM for RULER-QA, the official LLM-judge for LongMemEval(S*), choice accuracy

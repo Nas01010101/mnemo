@@ -52,6 +52,7 @@ class Memory:
     salience: float
     kind: str = "fact"
     source: str | None = None
+    key: str | None = None  # semantic "subject::attribute" key (fact rows only)
 
     @property
     def is_current(self) -> bool:
@@ -328,6 +329,38 @@ class MemoryCore:
                     fresh_rows = [row for row in fresh_rows if row["id"] not in have]
             return out
 
+    # ---- belief state (demo UI) -------------------------------------------
+    def list_beliefs(self, as_of: float | None = None) -> list[dict]:
+        """Distilled facts as plain dicts, for a UI belief-state view (no LLM).
+
+        as_of=None: EVERY unarchived fact (current + superseded) — the full
+        per-key history a UI needs to render "current, with struck-through
+        history below". as_of=<ts>: only facts true-in-the-world and
+        known-to-the-system at that instant (time-travel snapshot, mirrors
+        `recall`'s bi-temporal filter) — one entry per key, status "current"
+        relative to that moment.
+        """
+        with self._lock:
+            if as_of is None:
+                rows = self.db.execute(
+                    "SELECT * FROM memories WHERE kind='fact' AND archived=0 "
+                    "ORDER BY skey, valid_at"
+                ).fetchall()
+                return [
+                    {"id": r["id"], "key": r["skey"] or "(unkeyed)", "text": r["text"],
+                     "valid_at": r["valid_at"], "expired_at": r["expired_at"],
+                     "status": "superseded" if r["expired_at"] is not None else "current"}
+                    for r in rows
+                ]
+            rows = [r for r in self._rows_as_of(as_of) if r["kind"] == "fact"]
+            rows.sort(key=lambda r: (r["skey"] or "(unkeyed)", r["valid_at"]))
+            return [
+                {"id": r["id"], "key": r["skey"] or "(unkeyed)", "text": r["text"],
+                 "valid_at": r["valid_at"], "expired_at": r["expired_at"],
+                 "status": "current"}
+                for r in rows
+            ]
+
     # ---- forgetting ------------------------------------------------------
     def _decay(self, row) -> float:
         """Score in (0,1]. Pinned never decays. Recency half-life, boosted by how
@@ -406,7 +439,7 @@ class MemoryCore:
             invalid_at=row["invalid_at"], expired_at=row["expired_at"],
             last_access=row["last_access"], uses=row["uses"],
             pinned=bool(row["pinned"]), salience=row["salience"],
-            kind=row["kind"], source=row["source"],
+            kind=row["kind"], source=row["source"], key=row["skey"],
         )
 
     def stats(self) -> dict:

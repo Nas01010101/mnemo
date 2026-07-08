@@ -40,7 +40,8 @@ api = ["fastapi>=0.110", "uvicorn>=0.27"]
 mcp = ["mcp>=1.2"]
 oss = ["oss2>=2.18"]
 local = ["sentence-transformers>=3.0"]
-all = ["tenet-memory[api,mcp,oss,local]"]
+cli = ["rich>=13"]
+all = ["tenet-memory[api,mcp,oss,local,cli]"]
 
 [project.urls]
 Homepage = "https://github.com/Nas01010101/tenet"
@@ -48,6 +49,7 @@ Repository = "https://github.com/Nas01010101/tenet"
 Issues = "https://github.com/Nas01010101/tenet/issues"
 
 [project.scripts]
+tenet = "tenet.cli:main"
 tenet-agent = "tenet.agent:main"
 tenet-mcp = "tenet.mcp_server:main"
 
