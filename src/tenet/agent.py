@@ -35,8 +35,11 @@ class MemoryAgent:
              {"role": "user", "content": user_msg}],
             qwen_default=config.QWEN_MODEL, max_tokens=300,
         )
+        before = self.m.stats()["superseded"]
         learned = self.m.ingest(user_msg)          # extract + store facts (with supersession)
-        return {"reply": reply, "learned": len(learned), "recalled": [x.text for x in mems]}
+        superseded = self.m.stats()["superseded"] - before
+        return {"reply": reply, "learned": len(learned), "superseded": superseded,
+                "recalled": [x.text for x in mems]}
 
     def recall_history(self, topic: str, as_of: float | None = None):
         """Time-travel: what the user believed/said about `topic`, optionally as-of a time."""

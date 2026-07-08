@@ -78,7 +78,31 @@ state** — a compact *world model of the user* — and stays correct where retr
 
 Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
 
-## Results (LongMemEval_S, n=40, gpt-4o reader — honest, reproducible; detail in [`docs/BENCHMARK.md`](docs/BENCHMARK.md))
+## Quickstart
+
+```bash
+pip install tenet-memory                    # library: from tenet import Tenet
+```
+
+More in [`examples/`](examples/) — quickstart, assistant loop, MCP client, LangChain adapter.
+
+Running from source (full assistant + surfaces):
+```bash
+cp .env.example .env && chmod 600 .env      # add DASHSCOPE_API_KEY (Qwen Cloud)
+pip install -e .
+python scripts/smoke_test.py                # verify connectivity
+uvicorn tenet.api:app --host 0.0.0.0 --port 8000  # HTTP API incl. POST /chat
+python -m tenet.mcp_server                   # or the MCP server (learn/recall/forget/stats)
+```
+
+**Works with:** any MCP client ([Claude Desktop](examples/03_mcp_client.md), IDEs, other
+agents) · [LangChain](examples/04_langchain_memory.py) via a thin `TenetMemory` adapter ·
+plain HTTP (`tenet.api:app`, `POST /chat`).
+
+## Results
+
+LongMemEval_S (n=40, gpt-4o reader) — honest, reproducible; full detail in
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md).
 
 > **Note:** the shipped product runs **entirely on Qwen Cloud** (`text-embedding-v4`,
 > `qwen3.6-flash`, `qwen3.7-plus`). `gpt-4o`/`gpt-4o-mini` appear below **only as frozen
@@ -142,22 +166,12 @@ python -m tenet.agent          # interactive assistant (or: tenet-agent)
 python scripts/demo_agent.py   # the scripted story (video walkthrough)
 ```
 
-## Quickstart
+## Architecture
+![architecture](docs/architecture.svg)
 
-```bash
-pip install tenet-memory                    # library: from tenet import Tenet
-```
-
-More in [`examples/`](examples/) — quickstart, assistant loop, MCP client, LangChain adapter.
-
-Running from source (full assistant + surfaces):
-```bash
-cp .env.example .env && chmod 600 .env      # add DASHSCOPE_API_KEY (Qwen Cloud)
-pip install -e .
-python scripts/smoke_test.py                # verify connectivity
-uvicorn tenet.api:app --host 0.0.0.0 --port 8000  # HTTP API incl. POST /chat
-python -m tenet.mcp_server                   # or the MCP server (learn/recall/forget/stats)
-```
+Two layers over one bi-temporal store (beliefs + evidence), two surfaces (MCP + HTTP),
+powered by Qwen Cloud (Alibaba Cloud Model Studio). Details: [`docs/DESIGN.md`](docs/DESIGN.md),
+positioning vs Mem0/Zep/Letta/Mastra: [`docs/COMPARISON.md`](docs/COMPARISON.md).
 
 ## Reproduce the paper
 ```bash
@@ -168,13 +182,6 @@ python scripts/lme_recall.py --limit 40 --k 10 --qa --seed 2 --expand 20        
 python scripts/bench_knowledge_update.py --principals 4                         # ablation + efficiency
 # off-Qwen: prefix with  LLM_PROVIDER=openrouter EMBED_PROVIDER=local OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
-
-## Architecture
-![architecture](docs/architecture.svg)
-
-Two layers over one bi-temporal store (beliefs + evidence), two surfaces (MCP + HTTP),
-powered by Qwen Cloud (Alibaba Cloud Model Studio). Details: [`docs/DESIGN.md`](docs/DESIGN.md),
-positioning vs Mem0/Zep/Letta/Mastra: [`docs/COMPARISON.md`](docs/COMPARISON.md).
 
 ## Repository
 ```

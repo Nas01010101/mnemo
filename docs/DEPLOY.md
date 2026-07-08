@@ -28,7 +28,7 @@ the running process); Function Compute is cheaper/serverless.
 ## Prereqs (both paths)
 - Alibaba Cloud account + a **RAM user** with an AccessKey (ID + Secret), scoped to
   ECS/FC + OSS (don't use the root AccessKey).
-- An OSS bucket (for memory snapshots), e.g. `mnemo-<you>` in `ap-southeast-1`.
+- An OSS bucket (for memory snapshots), e.g. `tenet-<you>` in `ap-southeast-1`.
 - Env values ready: `DASHSCOPE_API_KEY`, `ALIBABA_CLOUD_ACCESS_KEY_ID/_SECRET`,
   `OSS_ENDPOINT` (e.g. `https://oss-ap-southeast-1.aliyuncs.com`), `OSS_BUCKET`.
 
@@ -39,22 +39,22 @@ the running process); Function Compute is cheaper/serverless.
 # 2. SSH in, install Docker, clone the repo:
 ssh root@<PUBLIC_IP>
 apt-get update && apt-get install -y docker.io git
-git clone <YOUR_REPO_URL> mnemo && cd mnemo
+git clone <YOUR_REPO_URL> tenet && cd tenet
 # 3. Run the backend (env vars injected, never baked in):
-docker build -t mnemo .
-docker run -d --name mnemo -p 8000:8000 \
+docker build -t tenet .
+docker run -d --name tenet -p 8000:8000 \
   -e DASHSCOPE_API_KEY=$DASHSCOPE_API_KEY \
   -e ALIBABA_CLOUD_ACCESS_KEY_ID=$AK_ID \
   -e ALIBABA_CLOUD_ACCESS_KEY_SECRET=$AK_SECRET \
   -e OSS_ENDPOINT=$OSS_ENDPOINT -e OSS_BUCKET=$OSS_BUCKET \
-  mnemo
+  tenet
 # 4. Verify from your laptop (this is the proof shot):
 curl http://<PUBLIC_IP>:8000/health
 curl -X POST http://<PUBLIC_IP>:8000/ingest -H 'content-type: application/json' \
   -d '{"message":"I moved to Toronto last week."}'
 ```
 For the proof recording: show `curl http://<PUBLIC_IP>:8000/health` returning ok, the
-`docker ps` / `docker logs mnemo` on the ECS box, and one `python -m tenet.alicloud_oss snapshot`
+`docker ps` / `docker logs tenet` on the ECS box, and one `python -m tenet.alicloud_oss snapshot`
 writing to OSS (visible in the OSS console).
 
 ## Path B — Function Compute (serverless, cheapest)

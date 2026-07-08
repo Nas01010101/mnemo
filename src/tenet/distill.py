@@ -57,6 +57,10 @@ def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
         data = json.loads(raw)
     except json.JSONDecodeError:
         return []
+    if isinstance(data, list):  # weaker models sometimes return the bare facts list
+        data = {"facts": data}  # instead of the {"facts": [...]} envelope — tolerate it
+    elif not isinstance(data, dict):
+        return []
     out: list[Fact] = []
     for f in data.get("facts", []):
         stmt = (f.get("statement") or "").strip()

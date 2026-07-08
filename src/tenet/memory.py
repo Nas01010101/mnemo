@@ -52,6 +52,7 @@ class Memory:
     salience: float
     kind: str = "fact"
     source: str | None = None
+    key: str | None = None  # semantic "subject::attribute" key (fact rows only)
 
     @property
     def is_current(self) -> bool:
@@ -406,7 +407,7 @@ class MemoryCore:
             invalid_at=row["invalid_at"], expired_at=row["expired_at"],
             last_access=row["last_access"], uses=row["uses"],
             pinned=bool(row["pinned"]), salience=row["salience"],
-            kind=row["kind"], source=row["source"],
+            kind=row["kind"], source=row["source"], key=row["skey"],
         )
 
     def stats(self) -> dict:
