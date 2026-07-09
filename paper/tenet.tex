@@ -214,8 +214,11 @@ embedding-only---no LLM, no training---the training-free counterpart to NapMem's
 learned stop and MemFlow's LLM-Validator retry, at $\sim$ms latency. Validated as a
 \emph{mechanism} on a deterministic synthetic store (bridge fact reached via an
 associative hop; early-stop at hop 2 on a saturated query vs.\ hop 3 on a multi-hop
-one); its effect on FC-MH accuracy (our weakest cell, $30.2$) is future measurement,
-not claimed here.
+one). A subsequent seeded A/B at the \texttt{qwen3.7-plus} tier (FC 6k cells,
+$n{=}20$) measured \emph{no benefit}: identical accuracy to default recall, $-5$
+to $-10$pp vs.\ a fixed-4-hop arm, all within Wilson CIs---a strong reader is
+robust to the larger fixed pool, so adaptive early-stopping buys no precision.
+We report navigation as a mechanism, not a measured gain.
 
 \section{Experiments}
 \textbf{Protocol.} LongMemEval\_S (500 questions, ${\sim}115$k-token histories).

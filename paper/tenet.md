@@ -237,9 +237,15 @@ synthetic store (hashed bag-of-words embeddings, no network call), `navigate()`
 (a) reaches a bridge fact invisible to broad top-*k* retrieval via an associative hop,
 and (b) stops early (hop 2) on a saturated single-hop query while continuing to hop 3 on
 a genuinely multi-hop one, confirming the gate behaves as intended (multi-hop reach,
-single-hop early-stop). Whether this moves FactConsolidation multi-hop accuracy (§4,
-our weakest cell at 30.2) over the best fixed-`hops` baseline is a benchmark measurement
-left to future work; we do not claim it here.
+single-hop early-stop). A subsequent seeded A/B on FactConsolidation 6k cells at the
+`qwen3.7-plus` tier (n=20 per cell, same reader, prompts, and seed; retrieval-pool
+construction the only variable) measured *no benefit*: accuracy identical to default
+recall on both cells, and −5 to −10pp against a fixed-4-hop arm, all within Wilson CIs.
+Dumped trajectories confirm the mechanism executed as designed (pools differed from
+baseline in 21/21 rows, adaptive depth 2–3): a sufficiently strong reader is robust to
+the larger fixed pool, so adaptive early-stopping buys no answer precision at this tier.
+We therefore report navigation as a mechanism contribution only, with a measured null
+at the tested tier.
 
 ## 4. Experiments
 
