@@ -21,7 +21,7 @@
 [![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](src/tenet/mcp_server.py)
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
 
-*A memory that stays true as the world changes.*
+*Memory reads shouldn't cost an LLM call.*
 
 ```bash
 pip install tenet-memory   # not yet on PyPI — until it lands, install from source (below)
@@ -33,15 +33,30 @@ mem = Tenet()
 mem.ingest("I live in Boston")              # needs an LLM key (distills the raw message)
 mem.ingest("I moved to Seattle")            # supersedes — Boston kept in history
 mem.recall("where do I live?")              # → [Seattle]  (current beliefs, no LLM call)
-mem.recall("where do I live?", as_of=t0)    # → [Boston]   (time-travel)
+mem.recall("where do I live?", as_of=t0)    # → [Boston]   (time-travel, no LLM call)
+mem.navigate("where do I live and work?")   # → adaptive multi-hop recall, no LLM call
 ```
-`recall`/`stats`/`doubts` are LLM-free (embeddings + closed-form math only — `EMBED_PROVIDER=local`
-runs them with zero API key). `ingest`/the chat agent need a working `DASHSCOPE_API_KEY` (or
-`LLM_PROVIDER=openrouter` + `OPENROUTER_API_KEY`) since distillation is one LLM call per message.
+`recall` / `stats` / `doubts` / time-travel (`recall(as_of=...)`) / `navigate` are **LLM-free** —
+embeddings + cosine + closed-form math only, low-milliseconds, and with `EMBED_PROVIDER=local`
+none of them need an API key at all. `ingest` (and the chat agent) need a working
+`DASHSCOPE_API_KEY` (or `LLM_PROVIDER=openrouter` + `OPENROUTER_API_KEY`) since turning free-form
+text into atomic facts is the one judgment call that needs a model — see
+[the 60-second zero-key demo](#quickstart) below for exactly where that line sits.
 
 </div>
 
 ---
+
+## Memory reads shouldn't cost an LLM call
+
+Most agent-memory systems architect the *read* path around an LLM in the loop — a rerank
+call, a synthesis pass, an agent deciding what to fetch next. **Tenet's bet is the opposite:**
+`recall`, `doubts`, time-travel (`recall(as_of=...)`), and the adaptive multi-hop `navigate()` are pure vector
+similarity + closed-form math, so they cost no API call and no inference latency — the thing
+that *does* need judgment (turning a raw message into atomic, keyed facts) happens once, at
+**write time** (`ingest`), not on every read. Supersession itself — the mechanism that keeps
+answers correct as facts change — is deterministic bi-temporal bookkeeping; no model is in that
+loop either.
 
 LLM-agent memory is almost always **retrieval over a log of past turns**. That's the wrong
 abstraction for an agent modeling a *changing* world: as a fact is updated over a long
@@ -78,37 +93,68 @@ state** — a compact *world model of the user* — and stays correct where retr
 | forgetting | none (grows forever) | salience-decay sweep |
 | fact drift | unmodeled | **learned hazards** — P(still valid) per attribute, `tenet doubts` |
 | queryable across time | no | **time-travel** (`recall(as_of=t)`) |
+| multi-hop bridging | fixed-depth *k*, or none | **adaptive `navigate()`** — deepens hops only while new evidence clears a relevance-gain gate, LLM-free |
 | read path | — | **no LLM call** |
 
 Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
 
 ## Quickstart
 
+### 1. 60 seconds, no API key
+
 ```bash
-pip install tenet-memory                    # library: from tenet import Tenet (not yet on PyPI — see below)
+pip install tenet-memory[local]             # bge-small embedder, CPU — no network call at all
+python examples/00_zero_key_demo.py         # supersession + time-travel + doubts, zero LLM calls
 ```
+Walks the entire LLM-free read path end to end — recall, supersession, time-travel, and the
+learned-dynamics `doubts` — against a pre-formed fact ledger. The one thing it *can't* show is
+`ingest()` turning free-form conversation into those facts; that's the one call in Tenet that
+needs a model (next step).
 
-More in [`examples/`](examples/) — quickstart, assistant loop, MCP client, LangChain adapter.
+### 2. The full agent (needs an API key)
 
-Running from source (full assistant + surfaces):
 ```bash
 cp .env.example .env && chmod 600 .env      # add DASHSCOPE_API_KEY (Qwen Cloud)
-pip install -e ".[all]"                     # base + api/mcp/oss/local/cli extras
+pip install -e ".[all]"                     # base + api/mcp/oss/local/cli/langgraph extras
 python scripts/smoke_test.py                # verify connectivity
 uvicorn tenet.api:app --host 0.0.0.0 --port 8000  # HTTP API incl. POST /chat
-python -m tenet.mcp_server                   # or the MCP server (learn/recall/forget/stats)
+python -m tenet.mcp_server                   # or the MCP server (learn/recall/navigate/forget/stats)
 ```
 `pip install -e .` alone only pulls the base library (`openai`, `numpy`) — the API server and
 MCP server need the `api`/`mcp` extras (bundled in `[all]` above), or install just what you need,
-e.g. `pip install -e ".[api]"`. No key yet? `tenet recall` / `tenet stats` / `tenet doubts` work
-fully offline with `EMBED_PROVIDER=local` (installs `sentence-transformers`, no network call at
-all); `tenet remember` / `tenet chat` / the MCP `learn` tool need a real `DASHSCOPE_API_KEY` (or
-`LLM_PROVIDER=openrouter`) since they distill text with an LLM call — without one you'll see a
-clear "memory write failed: ..." error rather than a silent no-op.
+e.g. `pip install -e ".[api]"`. No key yet? `tenet recall` / `tenet navigate` / `tenet stats` /
+`tenet doubts` work fully offline with `EMBED_PROVIDER=local` (installs `sentence-transformers`,
+no network call at all); `tenet remember` / `tenet chat` / the MCP `learn` tool need a real
+`DASHSCOPE_API_KEY` (or `LLM_PROVIDER=openrouter`) since they distill text with an LLM call —
+without one you'll see a clear "memory write failed: ..." error rather than a silent no-op.
+
+More in [`examples/`](examples/) — zero-key demo, quickstart, assistant loop, MCP client,
+LangChain adapter, LangGraph `BaseStore` adapter.
 
 **Works with:** any MCP client ([Claude Desktop](examples/03_mcp_client.md), IDEs, other
 agents) · [LangChain](examples/04_langchain_memory.py) via a thin `TenetMemory` adapter ·
-plain HTTP (`tenet.api:app`, `POST /chat`).
+[LangGraph](examples/05_langgraph_store.py) via a `BaseStore` adapter (below) · plain HTTP
+(`tenet.api:app`, `POST /chat`).
+
+### LangGraph `BaseStore` adapter
+
+Tenet drops in as a LangGraph [`BaseStore`](https://langchain-ai.github.io/langgraph/reference/store/)
+— the interface `StateGraph.compile(store=...)` expects — so a LangGraph agent's long-term memory
+gets bi-temporal supersession for free: re-`put()`-ting a `(namespace, key)` retires the old
+value to history instead of overwriting it, the same mechanism `Tenet.ingest()` uses.
+
+```bash
+pip install tenet-memory[langgraph]
+```
+```python
+from tenet.integrations.langgraph import TenetStore
+
+store = TenetStore(db_path="data/agent.db")
+store.put(("users", "alex"), "residence", {"city": "Montreal"})
+store.put(("users", "alex"), "residence", {"city": "Toronto"})  # supersedes, not overwritten
+store.get(("users", "alex"), "residence").value                # -> {"city": "Toronto"}
+```
+Full example (put/get/search/delete/list_namespaces): [`examples/05_langgraph_store.py`](examples/05_langgraph_store.py).
 
 ## Results
 
@@ -209,12 +255,17 @@ tenet bench run knowledge-update --provider ollama --principals 4               
 ```
 paper/tenet.md tenet_full.pdf   the paper (2-page + full preprint)
 src/tenet/  core.py memory.py distill.py config.py   the belief-state memory engine
+            navigate.py                               adaptive LLM-free multi-hop recall
             agent.py                                  the assistant
             mcp_server.py api.py alicloud_oss.py      surfaces + Alibaba Cloud deploy
-examples/   quickstart, assistant loop, MCP client, LangChain adapter
+            integrations/langgraph.py                 LangGraph BaseStore adapter
+examples/   00_zero_key_demo.py 01_quickstart.py 02_assistant.py 04_langchain_memory.py
+            05_langgraph_store.py                     zero-key demo, quickstart, assistant loop,
+                                                        LangChain + LangGraph adapters
 scripts/    demo_agent.py    video walkthrough
             bench_horizon.py bench_factcon.py bench_mab_ar.py lme_recall.py   benchmarks
-            test_memory.py test_tenet_e2e.py smoke_test.py                    tests
+            test_memory.py test_dynamics.py test_agent_uncertainty.py test_errors.py
+            test_langgraph_store.py test_navigate.py test_tenet_e2e.py smoke_test.py   tests
 docs/ BENCHMARK.md COMPARISON.md DESIGN.md DEPLOY.md  architecture.svg horizon.svg
 ```
 
