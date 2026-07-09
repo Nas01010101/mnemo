@@ -16,10 +16,51 @@ from .core import Tenet
 
 _SYS = """You are a warm, concise personal assistant with long-term memory of the user.
 Use ONLY the remembered facts below to personalise your reply; never invent facts about
-them. If a fact recently changed, acknowledge the current value naturally.
+them. If a fact recently changed, acknowledge the current value naturally. A fact marked
+with a confidence caveat may be stale — hedge naturally or ask to re-confirm instead of
+stating it as certain.
 
 What you remember about the user:
-{memories}"""
+{memories}{doubts}"""
+
+# World-model layer (dynamics.py) attaches a learned P(still valid) to keyed facts.
+# ANNOTATION ONLY below — never used to filter/reorder recall (measured: rank-demoting
+# doubted facts broke the churn benchmark 100%->33%). We only decide how to *word* a
+# fact that's already been recalled on its normal relevance rank.
+_CONF_THRESHOLD = 0.6   # below this, caveat the fact in the prompt
+_DOUBT_THRESHOLD = 0.5  # uncertain_facts() cutoff for the session-start doubts line
+_DOUBT_TOP_N = 3
+
+
+def _fmt_age(seconds: float) -> str:
+    days = seconds / 86400.0
+    return "<1d ago" if days < 1 else f"{days:.0f}d ago"
+
+
+def _format_memories(mems, *, now: float) -> str:
+    """Render recalled memories as bullet lines. Facts below _CONF_THRESHOLD get a
+    compact, token-cheap caveat (confidence + age); confident facts stay clean."""
+    if not mems:
+        return "(nothing yet)"
+    lines = []
+    for m in mems:
+        line = f"- {m.text}"
+        if m.confidence is not None and m.confidence < _CONF_THRESHOLD:
+            line += (f"  [confidence {m.confidence:.2f} — last confirmed "
+                     f"{_fmt_age(now - m.valid_at)}; may be stale, hedge or re-confirm]")
+        lines.append(line)
+    return "\n".join(lines)
+
+
+def _format_doubts_line(doubts: list[dict]) -> str:
+    """One line naming the most-doubted current beliefs (top _DOUBT_TOP_N by lowest
+    P(valid)), for the agent to proactively re-confirm when contextually relevant —
+    not a forced interrogation every turn. Empty doubts -> empty string, zero overhead."""
+    if not doubts:
+        return ""
+    top = ", ".join(f"{d['key']} (P={d['p_valid']:.2f})" for d in doubts[:_DOUBT_TOP_N])
+    return ("\n\nBeliefs likely stale — proactively re-confirm naturally when "
+            f"contextually relevant (don't interrogate): {top}")
 
 
 def _is_pure_question(msg: str) -> bool:
@@ -39,13 +80,17 @@ def _is_pure_question(msg: str) -> bool:
 class MemoryAgent:
     def __init__(self, db_path=None, *, now=time.time):
         self.m = Tenet(db_path, now=now) if db_path else Tenet(now=now)
+        # Anticipatory verification: session-start check of what the world model
+        # doubts, cached once (not recomputed per turn). Empty store/no doubts ->
+        # empty line, no crash (uncertain_facts is pure SQL + closed-form fit).
+        self._doubts_line = _format_doubts_line(self.m.uncertain_facts(threshold=_DOUBT_THRESHOLD))
 
     def respond(self, user_msg: str, *, k: int = 8) -> dict:
         """Recall relevant memory → answer with Qwen → learn from what the user said."""
         mems = self.m.recall(user_msg, k=k, expand=4)
-        ctx = "\n".join(f"- {x.text}" for x in mems) or "(nothing yet)"
+        ctx = _format_memories(mems, now=self.m._now())
         reply = config.chat(
-            [{"role": "system", "content": _SYS.format(memories=ctx)},
+            [{"role": "system", "content": _SYS.format(memories=ctx, doubts=self._doubts_line)},
              {"role": "user", "content": user_msg}],
             qwen_default=config.QWEN_MODEL, max_tokens=300,
         )

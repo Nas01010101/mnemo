@@ -78,6 +78,11 @@ class Tenet:
     def forget_sweep(self) -> int:
         return self.core.forget_sweep()
 
+    def uncertain_facts(self, threshold: float = 0.5) -> list[dict]:
+        """Current keyed facts the learned world model doubts — see MemoryCore
+        for the full docstring."""
+        return self.core.uncertain_facts(threshold=threshold)
+
     def stats(self) -> dict:
         return self.core.stats()
 
