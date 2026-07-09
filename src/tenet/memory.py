@@ -423,12 +423,18 @@ class MemoryCore:
                     "SELECT * FROM memories WHERE kind='fact' AND archived=0 "
                     "ORDER BY skey, valid_at"
                 ).fetchall()
-                return [
-                    {"id": r["id"], "key": r["skey"] or "(unkeyed)", "text": r["text"],
-                     "valid_at": r["valid_at"], "expired_at": r["expired_at"],
-                     "status": "superseded" if r["expired_at"] is not None else "current"}
-                    for r in rows
-                ]
+                # UI-only doubt marker: same learned p_valid recall() attaches,
+                # never filters/sorts here either — see _p_valid.
+                dyn, now = self._dynamics(), self._now()
+                out = []
+                for r in rows:
+                    cur = r["expired_at"] is None
+                    p = self._p_valid(r, dyn, now) if cur else None
+                    out.append({"id": r["id"], "key": r["skey"] or "(unkeyed)", "text": r["text"],
+                                "valid_at": r["valid_at"], "expired_at": r["expired_at"],
+                                "status": "current" if cur else "superseded",
+                                "p_valid": None if p is None else round(p, 3)})
+                return out
             rows = [r for r in self._rows_as_of(as_of) if r["kind"] == "fact"]
             rows.sort(key=lambda r: (r["skey"] or "(unkeyed)", r["valid_at"]))
             return [

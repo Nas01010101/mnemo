@@ -111,6 +111,10 @@
     font-size:15.5px;
   }
   .belief-row .txt{flex:1; min-width:0}
+  .belief-row .txt.doubt{
+    text-decoration:underline dotted var(--red); text-decoration-thickness:1px;
+    text-underline-offset:3px; cursor:help;
+  }
   .belief-row .ts{
     font:10.5px/1.6 var(--mono); color:var(--muted); white-space:nowrap;
     font-variant-numeric:tabular-nums;
@@ -310,6 +314,13 @@
         const txt = document.createElement("span");
         txt.className = "txt";
         txt.textContent = cleanText(b.text, b.key);
+        // World-model doubt marker (annotation only — never hides/reorders a belief):
+        // a faint dotted underline on current facts the learned dynamics model
+        // thinks are likely stale, with p_valid on hover.
+        if (b.status === "current" && typeof b.p_valid === "number" && b.p_valid < 0.6) {
+          txt.classList.add("doubt");
+          txt.title = `p_valid=${b.p_valid.toFixed(2)} — the world model doubts this is still current`;
+        }
         row.appendChild(txt);
         if (b.status === "superseded") {
           const stamp = document.createElement("span");
