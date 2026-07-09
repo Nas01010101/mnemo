@@ -278,10 +278,13 @@ ingestion to LME-V2's web-agent trajectory haystacks [Wu 2026] (DOM states, acti
 up to 115M tokens), three LLM-free changes — structure-aware chunking, query cleaning,
 and Qwen3-Embedding + BM25 hybrid retrieval (RRF) — lifted gold-evidence recall from a
 naive port's ~12% to **59.7%** @48K budget (63.3% @72K; corpus ceiling ~92%) at ~0.25s
-query latency. End-to-end accuracy is reader-gated, not retrieval-gated: 4-bit and
-8-bit quantizations of the mandated Qwen3.5-9B reader both saturate at 45.1%
-[39.5, 50.8] (P(correct|gold)≈0.6 extraction ceiling); the substrate transfers, and the
-binding constraint is measurable and external to the memory.
+query latency. End-to-end accuracy is reader-gated, not retrieval-gated — and the gate is
+the *reasoning mode*, not precision: 4-bit local 45.1% [39.5, 50.8], 8-bit 40.3%,
+full-precision hosted *without* extended thinking 40.7% (over-abstains), all near the
+same P(correct|gold)≈0.5–0.6 extraction ceiling; the leaderboard-default extended
+thinking (~8K reasoning tokens/question) is what converts retrieval headroom, and lies
+outside our compute budget. The substrate transfers; the binding constraint is
+measurable and external to the memory.
 
 ## 5. Limitations
 

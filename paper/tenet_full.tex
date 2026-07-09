@@ -433,10 +433,14 @@ and hybrid retrieval---Qwen3-Embedding dense fused with BM25 by reciprocal-rank 
 Gold-evidence recall rose to \textbf{59.7\%} at a 48K reader budget (63.3\% at 72K)
 against a measured corpus ceiling of $\sim$92\%, with query latency $\sim$0.25\,s---the
 fast corner of the LAFS frontier. End-to-end accuracy proved \emph{reader-gated}, not
-retrieval-gated: with 4-bit and 8-bit local quantizations of the mandated reader,
-accuracy saturates at $45.1\%$ \ci{39.5}{50.8} regardless of quantization level, pinned
-by the same $P(\text{correct}\,|\,\text{gold retrieved})\approx0.6$ extraction ceiling;
-the full-precision mandated reader is required to convert the retrieval headroom. The
+retrieval-gated---and the gate is the \emph{reasoning mode}, not precision: a 4-bit
+local reader scores $45.1\%$ \ci{39.5}{50.8}, an 8-bit one $40.3\%$, and the
+full-precision hosted reader \emph{without} extended thinking $40.7\%$ (it
+over-abstains), all pinned near the same
+$P(\text{correct}\,|\,\text{gold retrieved})\approx0.5$--$0.6$ extraction ceiling.
+The leaderboard's default---extended thinking, $\sim$8K reasoning tokens per
+question---is what converts retrieval headroom to accuracy, and lies outside our
+compute budget. The
 case study supports the paper's central claim in a second modality: the memory
 substrate---LLM-free ingestion and sub-second reads---transfers, and where the system
 falls short the binding constraint is measurable and external to the memory.
