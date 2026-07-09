@@ -176,6 +176,11 @@ correlated key changes, neighbors' survival is discounted, so one observation up
 beliefs about unobserved attributes. Both surface as a per-fact `confidence` and an
 `uncertain_facts()` re-verification list. Deliberately annotation-only: rank-demoting
 doubted facts measurably re-created the churn failure (§4.2) before we reverted it.
+A trained alternative — a 276k-param GRU temporal point process (Weibull hazard +
+next-key + contrastive next-value heads) — beats the closed form decisively on
+planted non-memoryless structure (NLL 2.76→1.99, CI excludes 0; next-value 0.997
+recall@5 vs 0.05 chance; 5 seeds) but is honestly mixed on sparse real chains;
+it ships as a 1MB numpy artifact (106µs/query), opt-in, defaults unchanged.
 
 **3.7 Belief-anchored evidence expansion.** Compressing a session into a few keyed beliefs
 is what wins churn and efficiency, but it can drop the fine detail a multi-hop question

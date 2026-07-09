@@ -355,15 +355,27 @@ class MemoryCore:
             return out
 
     # ---- fact dynamics (the world-model layer) -----------------------------
-    def _dynamics(self) -> Dynamics:
-        """Learned lifetime model, refit lazily from the ledger when it changed."""
-        if self._dyn is None or self._dyn_dirty:
-            rows = self.db.execute(
-                "SELECT skey, valid_at, invalid_at FROM memories "
-                "WHERE kind='fact' AND skey IS NOT NULL AND archived=0"
-            ).fetchall()
-            self._dyn = Dynamics.fit(rows, now=self._now())
-            self._dyn_dirty = False
+    def _dynamics(self):
+        """Learned lifetime model, refit lazily from the ledger when it changed.
+
+        Default is the closed-form Gamma-exponential Dynamics (dynamics.py). Set env
+        TENET_DYNAMICS=neural (+ TENET_NEURAL_NPZ=<path>) to swap in the trained GRU
+        world model (dynamics_neural.py, numpy-only). The neural path needs per-event
+        value embeddings, so it binds the ledger's stored embeddings — use it with the
+        bge-small local embedder it was trained on (EMBED_PROVIDER=local, 384d)."""
+        if self._dyn is not None and not self._dyn_dirty:
+            return self._dyn
+        rows = self.db.execute(
+            "SELECT skey, valid_at, invalid_at, embedding FROM memories "
+            "WHERE kind='fact' AND skey IS NOT NULL AND archived=0"
+        ).fetchall()
+        import os
+        nd = None
+        if os.environ.get("TENET_DYNAMICS", "").lower() == "neural":
+            from .dynamics_neural import build_from_ledger  # numpy-only world model
+            nd = build_from_ledger(rows, now=self._now())   # None on any failure
+        self._dyn = nd if nd is not None else Dynamics.fit(rows, now=self._now())
+        self._dyn_dirty = False
         return self._dyn
 
     def _p_valid(self, row, dyn: Dynamics, now: float) -> float | None:

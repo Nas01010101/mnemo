@@ -253,6 +253,23 @@ the agent can use to re-verify with the user. Deliberately, confidence does
 and we measured rank-demotion re-creating the churn failure of \S\ref{sec:churn}
 (current value pushed behind distractors) before reverting to annotation-only.
 
+\paragraph{A trained neural dynamics module.} The closed-form model is memoryless by
+family; we also train a compact (276k-param, 1-layer GRU) \emph{neural temporal point
+process} over fact-update events, whose Weibull hazard head admits non-constant
+per-key hazards and whose auxiliary heads predict the next key to change (learned
+ripple) and the next value (contrastively, over embeddings). On a controlled synthetic
+corpus with planted periodic, bursty, and cascading structure---provably outside the
+closed-form family---the neural model reduces held-out NLL from 2.76 to 1.99
+nats/event (paired-bootstrap gain $0.81$, 95\% CI $[0.70, 0.93]$), halves survival
+mis-calibration (KS $0.56\!\to\!0.26$), and predicts the next value at $0.997$
+recall@5 vs $0.05$ chance, stable over five seeds. On real counterfactual-update
+chains the result is deliberately mixed: better calibration and observed-lifetime
+likelihood on FactConsolidation, but the censoring-dominated aggregate NLL loses to a
+marginal-rate baseline, and LongMemEval yields too few clean chains ($n{=}21$) to
+conclude. The exported model is a 1\,MB numpy artifact evaluated in $106\,\mu$s,
+opt-in behind an env flag with default behavior unchanged, and passes the
+churn-integrity guard.
+
 \subsection{Belief-anchored evidence expansion}\label{sec:expansion}
 Compressing a session into a few keyed beliefs wins churn and efficiency but can drop the
 fine detail a multi-hop question needs, even when the right session \emph{is} retrieved.

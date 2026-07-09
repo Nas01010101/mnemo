@@ -173,7 +173,12 @@ Co-supersession statistics add \emph{ripple}: a correlated key's change discount
 neighbors' survival, so one observation updates beliefs about unobserved attributes.
 Surfaced as per-fact \texttt{confidence} + an \texttt{uncertain\_facts()}
 re-verification list; deliberately annotation-only (rank-demotion measurably
-re-created the churn failure before we reverted it).
+re-created the churn failure before we reverted it). A trained alternative---a
+276k-param GRU temporal point process (Weibull hazard + next-key + contrastive
+next-value heads)---beats the closed form decisively on planted non-memoryless
+structure (NLL $2.76\!\to\!1.99$, CI excludes 0; next-value 0.997 recall@5 vs 0.05
+chance; 5 seeds) but is honestly mixed on sparse real chains; it ships as a 1\,MB
+numpy artifact ($106\,\mu$s/query), opt-in, defaults unchanged.
 
 \textbf{Belief-anchored evidence expansion.} Compressing a session into a few beliefs wins
 churn and efficiency but can drop the detail a multi-hop question needs, even when the right

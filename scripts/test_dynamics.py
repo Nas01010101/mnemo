@@ -3,9 +3,14 @@
 Run: EMBED_PROVIDER=local python scripts/test_dynamics.py
 No LLM; local embeddings only; simulated clock.
 """
+import os
 import sys
 import tempfile
 from pathlib import Path
+
+# This suite exercises the closed-form Dynamics layer (including its internals);
+# the neural model has its own verifier (scripts/verify_neural_mac.py).
+os.environ["TENET_DYNAMICS"] = ""
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
