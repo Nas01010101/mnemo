@@ -115,6 +115,17 @@ training time, ingestion time, or read time. Tenet reaches 60.0 at the same read
 with \textbf{zero-LLM ingestion and $\sim$2K read tokens per query} ($\sim$79\% of
 QwenLong-L1.5's score at under 2\% of its read budget), and its structural wins survive
 on a 7B backbone.
+\textbf{Active memory navigation.} A concurrent 2026 line makes memory access itself
+agentic. NapMem~\cite{napmem} exposes a four-level memory pyramid as a structured action
+space and trains a GRPO policy that descends it and stops once evidence is sufficient
+(trained 9B beats untrained 397B on memory benchmarks); QwenLong-L1.5~\cite{qwenlong}
+plans a navigational path over memory chunks (LongMemEval $+15.6$); MemFlow
+\cite{memflow} is training-free but LLM-mediated (router + LLM-Validator retry);
+MemReader~\cite{memreader} moves active navigation to the write side; AgeMem
+\cite{agemem} and Mem-$\alpha$~\cite{memalpha} RL-train the policy itself; MemCog
+\cite{memcog} reports a similar frame (affiliation unverified). All make the \emph{read}
+path agentic; Tenet keeps reads LLM-free and gets adaptive depth from an embedding
+saturation gate (\S\ref{sec:navigate}) instead of a learned stop.
 \textbf{OS-style / observational memory.} MemGPT/Letta~\cite{memgpt} page memory between
 context and archival storage; observational schemes keep a stable summary. Both are largely
 append-oriented and do not treat supersession or forgetting as first-class.
@@ -189,6 +200,22 @@ already-surfaced sessions}---evidence anchored to the belief state, not the whol
 haystack---under the same stale-echo filter. Setting $B$ to the baseline RAG budget makes
 expansion never spend more context than flat retrieval; the count $m$ is a knob ($m{=}0\to$
 efficiency point; $m$ large under $B\to$ parity point) that lets one system trace a frontier.
+
+\textbf{Saturation-gated navigation.}\label{sec:navigate} Associative multi-hop recall
+re-scores the store at a caller-fixed depth $N$; \texttt{navigate()} instead deepens
+iteratively, reusing belief-anchored expansion at each hop, and adopts hop $d{+}1$ only
+while its new evidence stays informative:
+\[
+\text{adopt hop } d{+}1 \iff \max_{e\in\textit{new}_{d+1}}\textit{score}(e) \ge
+\tau_{\text{gain}} = 0.15,
+\]
+stopping (budget $\le4$ hops) once no hop clears the gate. The gate is
+embedding-only---no LLM, no training---the training-free counterpart to NapMem's
+learned stop and MemFlow's LLM-Validator retry, at $\sim$ms latency. Validated as a
+\emph{mechanism} on a deterministic synthetic store (bridge fact reached via an
+associative hop; early-stop at hop 2 on a saturated query vs.\ hop 3 on a multi-hop
+one); its effect on FC-MH accuracy (our weakest cell, $30.2$) is future measurement,
+not claimed here.
 
 \section{Experiments}
 \textbf{Protocol.} LongMemEval\_S (500 questions, ${\sim}115$k-token histories).
@@ -339,6 +366,11 @@ evaluating agent memory.
 \bibitem{qwenlong} Shen et al. \emph{QwenLong-L1.5: Post-Training Recipe for Long-Context Reasoning and Memory Management}. arXiv:2512.12967, 2026.
 \bibitem{agemem} Yu et al. \emph{Agentic Memory: Learning Unified Long-Term and Short-Term Memory Management for LLM Agents}. arXiv:2601.01885, ACL 2026.
 \bibitem{actmem} Zhang et al. \emph{ActMem: Bridging the Gap Between Memory Retrieval and Reasoning in LLM Agents}. arXiv:2603.00026, 2026.
+\bibitem{napmem} \emph{NapMem: Memory as a Structured Action Space for Long-Horizon Agents}. arXiv:2607.05794, 2026. Qwen Large Model Application Team, Alibaba.
+\bibitem{memflow} \emph{MemFlow: Training-Free Intent-Routed Memory Orchestration with LLM Validation}. arXiv:2605.03312, 2026.
+\bibitem{memreader} \emph{MemReader: Active Extraction for Agent Memory Construction}. arXiv:2604.07877, 2026.
+\bibitem{memalpha} \emph{Mem-$\alpha$: Reinforcement-Learned Memory Construction for LLM Agents}. OpenReview, ICLR 2026.
+\bibitem{memcog} \emph{MemCog: Cognitively-Inspired Active Navigation of Agent Memory}. arXiv:2605.28046, 2026. (Affiliation unverified.)
 \bibitem{friston} Friston. \emph{The free-energy principle: a unified brain theory?} Nat.\ Rev.\ Neurosci., 2010.
 \end{thebibliography}
 

@@ -114,6 +114,24 @@ spend heavily — at training time, ingestion time, or read time. Tenet reaches 
 same benchmark at the same reader tier with **zero-LLM ingestion and ~2K read tokens per
 query** (~79% of QwenLong-L1.5's score at under 2% of its read budget), and its structural
 wins (knowledge churn, conflict resolution) survive on a 7B backbone.
+
+**Active memory navigation.** A concurrent 2026 line treats memory access itself as an
+agentic, learned process. NapMem [NapMem 2026] exposes a four-level memory pyramid (raw
+conversation / typed records / topic tracks / user profile) as a structured action space
+and trains a GRPO policy that descends the pyramid and stops once evidence is
+sufficient — a trained 9B policy beats an untrained 397B model on memory benchmarks.
+QwenLong-L1.5 [Shen 2026] additionally plans a navigational path over memory chunks,
+lifting LongMemEval by +15.6 points. MemFlow [MemFlow 2026] is training-free: an LLM
+router selects a memory tier per query, and an LLM Validator retries with a heavier tier
+on a low-confidence read. MemReader [MemReader 2026] moves the same active-navigation
+idea to the write side, extracting memory rather than passively logging it. AgeMem
+[Yu 2026] and Mem-α [Mem-alpha 2026] RL-train the read/construction policy itself;
+MemCog [MemCog 2026] reports a similar cognitive-navigation frame (affiliation
+unverified). All of these make the *read* path agentic — an LLM or an RL policy decides
+how deep to go and when to stop. Tenet takes the opposite bet on the read side: it keeps
+recall LLM-free and gets adaptive depth from an embedding saturation gate (§3.8) instead
+of a learned or LLM-mediated stop.
+
 **OS-style and observational memory.** MemGPT/Letta [Packer 2023] page memory between a
 context "RAM" and archival "disk", agent-managed. Mastra's Observational Memory maintains a
 stable, cacheable summary. Both are largely append-oriented and do not model fact
@@ -193,6 +211,35 @@ subject to the same belief–evidence consistency filter (§3.3) so no stale val
 *B* is set to the baseline RAG budget, so expansion never spends *more* context than flat
 retrieval; it is a knob (m=0 → the efficiency point; m large under budget *B* → the parity
 point) that lets one system trace an accuracy–efficiency frontier rather than sit at a point.
+
+**3.8 Saturation-gated navigation.** Belief-anchored expansion (§3.7) draws raw evidence
+from a session boundary; associative multi-hop recall goes further by re-conditioning the
+cue on retrieved evidence and re-scoring the store, but at a caller-fixed depth
+`hops = N`. A fixed *N* over-fetches simple queries (extra hops add distractors that hurt
+the reader) and under-fetches genuinely multi-hop ones. `navigate()` replaces the fixed
+depth with an iterative, budget-bounded hop-deepening loop that reuses belief-anchored
+expansion at every hop and adopts hop *d+1* only while its newly-reached evidence is
+still informative:
+
+  adopt hop *d+1*  ⇔  max₍e ∈ new at d+1₎ score(e) ≥ τ_gain   (τ_gain = 0.15),
+
+where "new at *d+1*" is evidence reached at depth *d+1* but not at depth *d*. When no hop
+clears the gate, or the hop budget (≤ 4, mirroring NapMem's tool-call budget) is
+exhausted, navigation stops and returns the last adopted pool, dropping the marginal
+hop's distractors rather than keeping them. The gate is an embedding-only
+marginal-relevance test over scores Tenet already computes for recall, so it adds no LLM
+call and requires no training: it is the training-free counterpart to NapMem's learned
+stop and to MemFlow's LLM-Validator retry, running at embedding-search latency (~ms)
+instead of an LLM round trip.
+
+We validate the mechanism, not a benchmark number. On a deterministic, torch-free
+synthetic store (hashed bag-of-words embeddings, no network call), `navigate()`
+(a) reaches a bridge fact invisible to broad top-*k* retrieval via an associative hop,
+and (b) stops early (hop 2) on a saturated single-hop query while continuing to hop 3 on
+a genuinely multi-hop one, confirming the gate behaves as intended (multi-hop reach,
+single-hop early-stop). Whether this moves FactConsolidation multi-hop accuracy (§4,
+our weakest cell at 30.2) over the best fixed-`hops` baseline is a benchmark measurement
+left to future work; we do not claim it here.
 
 ## 4. Experiments
 
@@ -347,6 +394,11 @@ belief-state view also yields time-travel and principled forgetting for free. We
 [MemStrata 2026] Temporal Validity in Retrieval Memory: Eliminating Stale-Fact Errors for AI Agents over Evolving Knowledge. arXiv:2606.26511.
 [Engram 2026] Less Context, More Accuracy: A Bi-Temporal Memory Engine for LLM Agents. arXiv:2606.09900.
 [TOKI 2026] TOKI: A Bitemporal Operator Algebra for Contradiction Resolution in LLM-Agent Persistent Memory. arXiv:2606.06240.
+[NapMem 2026] NapMem: Memory as a Structured Action Space for Long-Horizon Agents. arXiv:2607.05794 (Qwen Large Model Application Team, Alibaba).
+[MemFlow 2026] MemFlow: Training-Free Intent-Routed Memory Orchestration with LLM Validation. arXiv:2605.03312.
+[MemReader 2026] MemReader: Active Extraction for Agent Memory Construction. arXiv:2604.07877.
+[Mem-alpha 2026] Mem-α: Reinforcement-Learned Memory Construction for LLM Agents. OpenReview (ICLR 2026).
+[MemCog 2026] MemCog: Cognitively-Inspired Active Navigation of Agent Memory. arXiv:2605.28046. (Affiliation unverified.)
 [Friston] The free-energy principle: a unified brain theory? Nat. Rev. Neurosci., 2010.
 
 *Reproduce every number: see `docs/BENCHMARK.md` and `scripts/`.*
