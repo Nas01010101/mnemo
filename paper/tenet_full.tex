@@ -420,6 +420,27 @@ at every read. Mem0-style consolidation holds up single-hop (81.0) but collapses
 multi-hop (12.0); the graph arm is limited by 7B-quality OpenIE (66.0/9.0); overwrite
 memory loses information by construction (44.0/16.0).
 
+\subsection{Case study: web-agent trajectory memory (LongMemEval-V2)}\label{sec:lmev2}
+LongMemEval-V2~\cite{lmev2} shifts the setting from chat to \emph{web-agent trajectory}
+histories (up to 115M tokens; DOM states, actions, URLs) and scores a latency--accuracy
+frontier (LAFS) against a strong RAG reference (51.0\% accuracy) using a mandated
+Qwen3.5-9B reader. We adapted \tenet{}'s ingestion to this regime as a stress test of
+the retrieval substrate. A naive port (bge-small dense over trimmed DOM slices)
+retrieved the gold evidence for only $\sim$12\% of the 295 deterministic-metric
+questions. Three LLM-free changes rebuilt it: structure-aware chunking that keeps
+(action, URL, salient DOM) units together and dedups cross-state DOM; query cleaning;
+and hybrid retrieval---Qwen3-Embedding dense fused with BM25 by reciprocal-rank fusion.
+Gold-evidence recall rose to \textbf{59.7\%} at a 48K reader budget (63.3\% at 72K)
+against a measured corpus ceiling of $\sim$92\%, with query latency $\sim$0.25\,s---the
+fast corner of the LAFS frontier. End-to-end accuracy proved \emph{reader-gated}, not
+retrieval-gated: with 4-bit and 8-bit local quantizations of the mandated reader,
+accuracy saturates at $45.1\%$ \ci{39.5}{50.8} regardless of quantization level, pinned
+by the same $P(\text{correct}\,|\,\text{gold retrieved})\approx0.6$ extraction ceiling;
+the full-precision mandated reader is required to convert the retrieval headroom. The
+case study supports the paper's central claim in a second modality: the memory
+substrate---LLM-free ingestion and sub-second reads---transfers, and where the system
+falls short the binding constraint is measurable and external to the memory.
+
 \section{Discussion}
 \textbf{Where the belief state wins.} Both MAB competencies reward what supersession
 provides: FactConsolidation directly (the store contains exactly one current value; no
