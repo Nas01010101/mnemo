@@ -171,8 +171,10 @@ python scripts/demo_agent.py   # the scripted story (video walkthrough)
 ![architecture](docs/architecture.svg)
 
 Two layers over one bi-temporal store (beliefs + evidence), two surfaces (MCP + HTTP),
-powered by Qwen Cloud (Alibaba Cloud Model Studio). Details: [`docs/DESIGN.md`](docs/DESIGN.md),
-positioning vs Mem0/Zep/Letta/Mastra: [`docs/COMPARISON.md`](docs/COMPARISON.md).
+powered by Qwen Cloud (Alibaba Cloud Model Studio). One-page component diagram + key
+equations + the annotation-only invariant story: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+Original scoping: [`docs/DESIGN.md`](docs/DESIGN.md); positioning vs Mem0/Zep/Letta/Mastra:
+[`docs/COMPARISON.md`](docs/COMPARISON.md).
 
 ## Reproduce the paper
 Every benchmark is one CLI command — provider preset + config + git-sha logged to
