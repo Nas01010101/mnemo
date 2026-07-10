@@ -179,3 +179,35 @@ ephemeral `/tmp` means memory doesn't survive a cold start unless OSS snapshot/r
 - [x] `src/tenet/alicloud_oss.py` linked as the "uses Alibaba Cloud services/APIs" file
 - [ ] One OSS snapshot visible in the Alibaba Cloud console (blocked — OSS product not
       activated for this account; not required by the verbatim rules, see above)
+
+## Scale notes: what this FC deploy handles before it hits a wall
+
+Full methodology, tables, and the plot: [`docs/SCALE.md`](SCALE.md) (measured on a dev
+machine with deterministic synthetic embeddings, not on the live FC instance itself —
+read that doc's methodology section before treating these as FC-specific numbers; the
+architectural bottlenecks below are the same regardless of where the process runs).
+
+- **The live deploy's memory store is `/tmp/tenet.db` on FC's ephemeral filesystem**
+  (see "Current status" above) — every fact ever ingested during that instance's
+  lifetime lives in that one sqlite file, rebuilt into an in-memory matrix on *every*
+  `recall()` call (no caching — `docs/SCALE.md` "cold vs warm"). For a hackathon demo
+  session (tens to low hundreds of facts), this is comfortably sub-second; nothing in
+  this deploy's traffic pattern gets near the walls below.
+- **Recall crosses 100ms around 10k facts and 1s around 100k facts** on the reference
+  hardware measured in `docs/SCALE.md` — a live demo session driven by judges clicking
+  around would need to ingest ~10,000+ facts in one FC instance's warm lifetime before
+  this becomes noticeable, which isn't a realistic demo-traffic pattern.
+- **The tighter constraint for THIS deploy specifically is FC's own memory ceiling**,
+  not Tenet's asymptotic RAM growth: the function was created with `memorySize=512`
+  (512MB) — `docs/SCALE.md` measured ~1.15GB RSS at 100,000 facts (already over that
+  limit) and extrapolates to ~7.8GB at 1M. A single FC instance accumulating anywhere
+  near 100k facts in one warm lifetime would hit FC's memory cap and get OOM-killed
+  well before Tenet's own read-latency wall arrives. Bumping `memorySize` (FC supports
+  up to 32GB) defers this but doesn't remove it — the underlying fix is the resident/
+  incremental matrix + batched-commit work `docs/SCALE.md`'s verdict section
+  recommends, not a bigger instance.
+- **Ephemeral `/tmp` means this is moot for LONG-lived scale anyway**: a cold start
+  wipes the store, so no single FC instance's memory grows unbounded across restarts
+  regardless of traffic — durable scale (surviving cold starts at real volume) needs
+  the OSS snapshot/restore path (`src/tenet/alicloud_oss.py`) wired in, which is also
+  currently not done (OSS not activated for this account — see "Current status").
