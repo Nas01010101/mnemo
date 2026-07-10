@@ -462,6 +462,13 @@ without confidence intervals. Full tables and pipeline: `docs/BENCHMARK.md` §10
 
 ## 5. Limitations
 
+- **Verbatim-recall benchmarks favor raw storage.** On LoCoMo-10 (n=500 stratified,
+  qwen-judged, same reader/judge both arms) naive RAG beats Tenet 38.8 vs 33.8
+  (McNemar p=0.031): LoCoMo's gold answers often reward the *exact wording* of a raw
+  turn, and distillation paraphrases that wording away. LoCoMo stresses verbatim
+  multi-session recall, not knowledge churn — reported plainly (BENCHMARK.md §12).
+  Related audit finding: the LoCoMo audit's 156 entries correct evidence *citations*,
+  not gold answers — an "audit-corrected" key moves QA accuracy by exactly 0.0pp.
 - **Multi-session synthesis** is the one category where RAG still leads (42.9 vs 57.1).
   Belief-anchored expansion (§3.6) lifted it from 28.6 but does not close it: these questions
   need evidence from *several* sessions, and expansion only deepens the sessions the top-*k*
