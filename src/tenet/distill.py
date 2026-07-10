@@ -33,6 +33,14 @@ Rules:
   So "I live in X", "I moved to Y", "My name is Z" all use subject `user`
   (keys user::residence, user::residence, user::name). This keeps updates on the
   same attribute colliding on one key so later values supersede earlier ones.
+  Key on the CONCRETE attribute the value belongs to — the specific object noun —
+  NEVER a vague umbrella or the framing verb. Do NOT emit generic keys like
+  current_interest, interest, preference, activity, service, current_service, device,
+  thing, item, choice, update; use the specific attribute (coffee_order,
+  streaming_service, phone, commute_method, gym, hobby, car, laptop, milk). E.g.
+  "I'm really into oat-milk lattes now" -> user::coffee_order; "these days I'm into
+  climbing" -> user::hobby; "I now use a Pixel" -> user::phone. A vague key silently
+  breaks supersession, so always name the concrete thing.
 - salience: 0.0-1.0. Durable/identity/preference/commitment facts are high (0.7-1.0);
   transient small talk is low (0.0-0.3). Skip pure chit-chat entirely.
 - valid_at: an ISO-8601 date/time if the fact states when it becomes true, else null.

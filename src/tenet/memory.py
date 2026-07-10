@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -60,6 +61,76 @@ elif _CONSISTENCY_ENV.replace(".", "", 1).isdigit():
     _CONSISTENCY_THRESHOLD_DEFAULT = float(_CONSISTENCY_ENV)
 else:
     _CONSISTENCY_THRESHOLD_DEFAULT = None
+
+
+# --- Embedding-based key resolution (TENET_KEY_RESOLUTION) ------------------
+# The per-message distiller keys the SAME real-world attribute inconsistently
+# ("user::milk_preference" one turn, "user::milk" the next), so exact-skey
+# collision misses most natural-language preference updates (measured true-fire
+# 3.8% on PersonaMem-v2 retractions, BENCHMARK.md §13 — the reason we tied/lost
+# on preference-drift while winning on stable-attribute churn). When ON, store()
+# ALSO supersedes a current fact of the SAME subject whose attribute key is
+# embedding-near this one (cosine >= _TAU_KEY) and value-compatible (not a
+# sub-attribute of it). Fully LLM-free — reuses the fact embedder on the short
+# attribute slug. Default is env-driven and runtime-overridable (the firing
+# benchmark sweeps _TAU_KEY on a labeled set; see scripts/bench_supersession_firing.py).
+def _env_off(name: str, default_on: bool) -> bool:
+    v = os.environ.get(name, "").strip().lower()
+    if not v:
+        return default_on
+    return v not in ("0", "off", "false", "no")
+
+
+# Default flipped ON 2026-07-10 after the firing-fix gates passed (see
+# scripts/bench_supersession_firing.py + scratchpad/supersession_fix.md).
+# Force off with TENET_KEY_RESOLUTION=off.
+_KEY_RESOLUTION = _env_off("TENET_KEY_RESOLUTION", default_on=True)
+_TAU_KEY = float(os.environ.get("TENET_KEY_RESOLUTION_TAU", "0.78"))  # swept: 80% true-fire / 0% false-fire
+_TEXT_FLOOR = float(os.environ.get("TENET_KEY_RESOLUTION_TEXTFLOOR", "0.35"))
+# Sub-attribute qualifiers: a key whose attribute is <another attribute> + one of
+# these names a DIFFERENT property of the same object (pet vs pet_name, car vs
+# car_color) — an update to one must never supersede the other. Meta qualifiers
+# (preference/current/favorite/…) are deliberately NOT here, so "milk" and
+# "milk_preference" DO collapse onto the same slot.
+_SUB_ATTR_TOKENS = frozenset({
+    "name", "brand", "color", "colour", "type", "model", "id", "number", "num",
+    "count", "size", "age", "price", "cost", "date", "time", "year", "location",
+    "city", "address", "owner", "maker", "author", "title", "breed", "make",
+})
+
+
+def _split_key(k: str) -> tuple[str, str]:
+    # rpartition on the LAST "::" so multi-segment namespaces (the LangGraph store
+    # joins namespace+key into one skey, e.g. "users::alex::prefs") keep the whole
+    # namespace as the subject and only the final segment as the attribute — otherwise
+    # "users::alex::prefs" and "users::sam::prefs" would share subject "users" and be
+    # wrongly collapsed across users. For the distiller's 2-segment "user::milk" this
+    # is identical to a first-"::" split.
+    subj, _, attr = k.rpartition("::")
+    return subj, attr
+
+
+def _key_tokens(attr: str) -> set[str]:
+    return {t for t in re.split(r"[_\W]+", attr.lower()) if t}
+
+
+def _value_compatible(new_key: str, old_key: str) -> bool:
+    """True if `new_key` may supersede `old_key`: SAME subject and NOT a
+    sub-attribute refinement of the other. Blocks pet=dog vs pet_name=Rex and
+    car vs car_color from collapsing, while keeping milk vs milk_preference
+    compatible (the extra 'preference' token is not a sub-attribute qualifier)."""
+    ns, na = _split_key(new_key)
+    os_, oa = _split_key(old_key)
+    if ns != os_ or not na or not oa:
+        return False
+    ta, tb = _key_tokens(na), _key_tokens(oa)
+    if ta == tb:
+        return True
+    if ta < tb and (tb - ta) & _SUB_ATTR_TOKENS:
+        return False
+    if tb < ta and (ta - tb) & _SUB_ATTR_TOKENS:
+        return False
+    return True
 
 
 @dataclass
@@ -122,6 +193,7 @@ class MemoryCore:
         self._client = None
         self._dyn: Dynamics | None = None   # learned fact dynamics (lazily fitted)
         self._dyn_dirty = True
+        self._key_vec_cache: dict[str, np.ndarray] = {}  # attribute-slug embeddings (key resolution)
 
     # ---- embedding -------------------------------------------------------
     def _embed(self, text: str) -> np.ndarray:
@@ -199,6 +271,14 @@ class MemoryCore:
                         "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
                         (va, t, row["id"]),
                     )
+                # Embedding-based key resolution: also retire same-subject current facts
+                # whose attribute key the distiller spelled differently (milk vs
+                # milk_preference) — the fix for the 3.8% NL-update fire rate. Guarded
+                # (value_compatible + text floor) so distinct attributes never collapse.
+                if _KEY_RESOLUTION:
+                    p2, s2 = self._resolve_key_supersede(key, vec, va, t)
+                    pinned = pinned or p2
+                    salience = max(salience, s2)
             else:
                 hit = self._nearest_current(vec)  # (id, sim, text)
                 if hit and hit[1] >= dedup:
@@ -217,6 +297,54 @@ class MemoryCore:
             self.db.commit()
             self._dyn_dirty = True  # ledger changed -> refit dynamics lazily
             return cur.lastrowid
+
+    def _key_emb(self, key: str) -> np.ndarray:
+        """Embedding of a key's readable ATTRIBUTE slug (subject stripped so the shared
+        'user::' prefix doesn't inflate every pair's similarity). Cached per key."""
+        v = self._key_vec_cache.get(key)
+        if v is None:
+            _subj, attr = _split_key(key)
+            v = self._embed((attr.replace("_", " ") or key).strip())
+            self._key_vec_cache[key] = v
+        return v
+
+    def _resolve_key_supersede(self, key: str, text_vec: np.ndarray,
+                               va: float, t: float) -> tuple[bool, float]:
+        """Supersede current same-subject facts whose attribute key is embedding-near
+        `key` (cosine >= _TAU_KEY) and value-compatible. Returns (any_pinned, max_salience)
+        of the retired rows so the new fact can inherit those slot properties, mirroring
+        the exact-key path. Runs inside store()'s lock. LLM-free."""
+        subj, _ = _split_key(key)
+        if not subj:
+            return False, 0.0
+        rows = self.db.execute(
+            "SELECT id, skey, text, embedding, pinned, salience FROM memories "
+            "WHERE kind='fact' AND archived=0 AND expired_at IS NULL "
+            "AND skey IS NOT NULL AND skey<>? AND skey LIKE ?",
+            (key, subj + "::%"),
+        ).fetchall()
+        if not rows:
+            return False, 0.0
+        nk = self._key_emb(key)
+        any_pinned, max_sal = False, 0.0
+        for row in rows:
+            ok = row["skey"]
+            if not _value_compatible(key, ok):
+                continue
+            if float(np.dot(nk, self._key_emb(ok))) < _TAU_KEY:
+                continue
+            # domain floor on the FACT texts: a spuriously high key-sim must not collapse
+            # two facts that are actually about unrelated things.
+            ov = np.frombuffer(row["embedding"], dtype=np.float32)
+            if float(np.dot(text_vec, ov)) < _TEXT_FLOOR:
+                continue
+            any_pinned = any_pinned or bool(row["pinned"])
+            max_sal = max(max_sal, float(row["salience"]))
+            self.db.execute(
+                "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                (va, t, row["id"]),
+            )
+        return any_pinned, max_sal
 
     # ---- recall ----------------------------------------------------------
     def recall(
