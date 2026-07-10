@@ -422,6 +422,21 @@ the \texttt{gpt-4o-mini} and \texttt{gpt-4o} readers we ran
 $n{=}40$, we report one-shot accuracy as parity, not a win. The one category still behind
 RAG is multi-session synthesis (42.9 vs 57.1, up from 28.6; \S\ref{sec:limits}).
 
+\paragraph{Reader-generality at the frontier tier.} We subsequently ran the identical
+captured task set (fresh $n{=}40$ sample, seed 0, Qwen distiller) through three 2026
+frontier readers from independent families---\texttt{claude-sonnet-5},
+\texttt{gpt-5.5}, and \texttt{gemini-3.5-flash}---under one cross-family judge
+(\texttt{qwen3.7-plus}), zero exclusions. \tenet{} leads naive RAG in \textbf{6/6}
+(reader $\times$ operating point) comparisons: $90.0/90.0$ vs $82.5$ (Sonnet),
+$85.0/82.5$ vs $77.5$ (GPT-5.5), $90.0/90.0$ vs $82.5$ (Gemini), with
+accuracy-per-token $\approx 2\times$ RAG at the efficiency point under every reader.
+Per-cell Wilson CIs overlap at this $n$; the evidence is the directional replication
+across families. Notably, the multi-session weakness \emph{inverts} under all three
+frontier readers (RAG 50--62.5 vs \tenet{} 75--87.5): a sufficiently strong reader
+composes \tenet{}'s compact belief items across sessions better than it sifts a
+raw-turn pool. Artifacts: \texttt{docs/lme\_multireader\_results.json} and per-reader
+answer logs in the repository.
+
 \subsection{Ablations}\label{sec:ablation}
 On the controlled knowledge-update set, removing the belief--evidence consistency rule
 (\S\ref{sec:bec}) drops current-value accuracy from $100\%$ to $55\%$ with a $45\%$

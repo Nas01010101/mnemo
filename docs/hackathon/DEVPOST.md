@@ -165,6 +165,8 @@ Protocol · FastAPI · SQLite · NumPy · Alibaba Cloud OSS · LangGraph · Pyth
 ## Try it out
 - **Code repository:** https://github.com/Nas01010101/tenet (public, MIT license visible
   in About)
+- **Live demo, running on Alibaba Cloud:** https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run
+  (Function Compute; belief-ledger UI at `/`, `curl .../health`)
 - **60-second zero-key demo:** `pip install tenet-memory[local]` then
   `python examples/00_zero_key_demo.py`
 - **MCP config:** `examples/03_mcp_client.md`
@@ -174,6 +176,7 @@ Protocol · FastAPI · SQLite · NumPy · Alibaba Cloud OSS · LangGraph · Pyth
 - **Architecture diagram:** `docs/architecture.svg` in the repo
 - **Proof of Alibaba Cloud services/APIs:** `src/tenet/config.py` + `src/tenet/distill.py`
   + `src/tenet/memory.py` call `dashscope-intl.aliyuncs.com` (Alibaba Cloud Model
-  Studio); `src/tenet/alicloud_oss.py` is the optional OSS proof file. Backend-on-Alibaba-
-  Cloud deploy status: `docs/DEPLOY.md`.
+  Studio); `src/tenet/alicloud_oss.py` is the optional OSS proof file.
+- **Live backend on Alibaba Cloud:** https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run
+  — full deploy method + caveats: `docs/DEPLOY.md`.
 - **Blog post (optional, Blog Post Prize):** [BLOG URL] — candidate: `docs/BLOG.md`

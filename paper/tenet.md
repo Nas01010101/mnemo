@@ -291,6 +291,18 @@ The finding is **reader-robust**. On a cheaper `gpt-4o-mini` reader the parity p
 ahead (Tenet 60.0 vs RAG 55.0 QA at the same budgets); the efficiency point's per-token
 dominance holds across the `gpt-4o-mini` and `gpt-4o` readers we ran (≈1.6×).
 
+**Reader-generality at the frontier tier (2026-07-11).** The identical captured task set
+(fresh n=40 sample, seed 0, Qwen distiller) run through three 2026 frontier readers from
+independent families — `claude-sonnet-5`, `gpt-5.5`, `gemini-3.5-flash` — under one
+cross-family judge (`qwen3.7-plus`), zero exclusions: Tenet leads naive RAG in **6/6**
+(reader × operating point) comparisons — 90.0/90.0 vs 82.5 (Sonnet), 85.0/82.5 vs 77.5
+(GPT-5.5), 90.0/90.0 vs 82.5 (Gemini) — with accuracy-per-token ≈2× RAG at the
+efficiency point under every reader. Per-cell CIs overlap at this n; the evidence is the
+directional replication across families. Notably the multi-session weakness *inverts*
+under all three frontier readers (RAG 50–62.5 vs Tenet 75–87.5): a strong reader
+composes compact belief items across sessions better than it sifts a raw-turn pool.
+Artifacts: `docs/lme_multireader_results.json` + per-reader answer logs.
+
 **4.2 Knowledge churn (headline).** One fact updated *N* times amid distractors, k=6, 12
 principals/point:
 

@@ -205,6 +205,8 @@ with a 2-page paper + full preprint in `paper/`.
 - **Proof of Alibaba Cloud services/APIs:** `src/tenet/config.py` + `src/tenet/distill.py` +
   `src/tenet/memory.py` call `dashscope-intl.aliyuncs.com` (Alibaba Cloud Model Studio);
   optional OSS: `src/tenet/alicloud_oss.py`
+- **Live backend on Alibaba Cloud (bonus):** https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run
+  (Function Compute, `ap-southeast-1`) — `curl .../health`, `docs/DEPLOY.md`
 - **Blog post (optional, Blog Post Prize):** [BLOG URL]
 
 ## Submission checklist
@@ -215,19 +217,23 @@ with a 2-page paper + full preprint in `paper/`.
 - [ ] Text description (above)
 - [ ] Track identified (Track 1)
 - [ ] (optional) blog/social post linked
-- [ ] (optional, for full "runs on Alibaba Cloud" credit) backend deployed to ECS/FC —
-      see `docs/DEPLOY.md`
+- [x] (optional, for full "runs on Alibaba Cloud" credit) backend deployed to ECS/FC —
+      live at https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run, see `docs/DEPLOY.md`
 
 ## Devpost form draft
 Ready-to-paste content for every Devpost form field (tagline, inspiration,
 what-it-does, how-we-built-it, challenges, accomplishments, what's-next, built-with):
 [`docs/hackathon/DEVPOST.md`](DEVPOST.md).
 
-## Deploy status (checked 2026-07-10)
-Backend-on-Alibaba-Cloud (ECS/FC) is **not deployed** — `.env` has a working
-`DASHSCOPE_API_KEY` but no `ALIBABA_CLOUD_ACCESS_KEY_ID`/`_SECRET` (RAM AccessKey),
-which needs a human console step to generate. The "uses Alibaba Cloud services/APIs"
-proof requirement is satisfied independently of this (DashScope IS Alibaba Cloud Model
-Studio — see `docs/DEPLOY.md` "Current status"); only the optional deployed-backend
-credit is blocked. Deploy scripts for both ECS and Function Compute are ready to run the
-moment an AccessKey is available: `docs/DEPLOY.md`.
+## Deploy status (updated 2026-07-10)
+**Live on Alibaba Cloud Function Compute** (`ap-southeast-1`), verified working:
+**https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run** — `/health` returns 200, a
+real `POST /ingest` distills via `qwen3.6-flash` and stores successfully, and `GET /`
+serves the belief-ledger web demo UI, all live on Alibaba Cloud compute. Full
+deploy method, the two runtime-version pitfalls hit along the way
+(`custom.debian10`/`11`'s system Python is 3.7/3.9, too old for our deps —
+`custom.debian12` ships 3.11 and works), and the one known caveat (ephemeral `/tmp`,
+no OSS-backed persistence yet — OSS itself isn't activated for this account) are
+documented in `docs/DEPLOY.md` "Current status". The "uses Alibaba Cloud services/APIs"
+proof requirement (satisfied independently via DashScope) and this deployed-backend
+bonus credit are now both covered.

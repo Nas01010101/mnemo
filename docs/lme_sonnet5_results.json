@@ -1,0 +1,61 @@
+{
+ "run": "LME_S n=40 seed=0 k=10; reader=claude-sonnet-5 (batched subagent harness, 10q/agent, item-isolation instructed); judge=qwen3.7-plus (cross-family); distiller=qwen3.6-flash; embedder=bge-small local; date=2026-07-11",
+ "note": "different seed (0) and distiller than the documented gpt-4o table (seed 2, gpt-4o-mini distiller) \u2014 a new stack row, not a re-run of that row",
+ "arms": {
+  "rag": {
+   "acc": 82.5,
+   "ci": [
+    68.0,
+    91.3
+   ],
+   "n": 40,
+   "avg_reader_tokens": 2153,
+   "acc_per_1k": 38.3,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 50.0,
+    "single-session-assistant": 100.0,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 76.9
+   }
+  },
+  "tenet_eff": {
+   "acc": 90.0,
+   "ci": [
+    76.9,
+    96.0
+   ],
+   "n": 40,
+   "avg_reader_tokens": 1186,
+   "acc_per_1k": 75.9,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 75.0,
+    "single-session-assistant": 100.0,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 84.6
+   }
+  },
+  "tenet_par": {
+   "acc": 90.0,
+   "ci": [
+    76.9,
+    96.0
+   ],
+   "n": 40,
+   "avg_reader_tokens": 2143,
+   "acc_per_1k": 42.0,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 87.5,
+    "single-session-assistant": 83.3,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 84.6
+   }
+  }
+ },
+ "excluded": 0
+}
