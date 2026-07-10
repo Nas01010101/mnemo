@@ -182,32 +182,48 @@ ephemeral `/tmp` means memory doesn't survive a cold start unless OSS snapshot/r
 
 ## Scale notes: what this FC deploy handles before it hits a wall
 
-Full methodology, tables, and the plot: [`docs/SCALE.md`](SCALE.md) (measured on a dev
-machine with deterministic synthetic embeddings, not on the live FC instance itself —
-read that doc's methodology section before treating these as FC-specific numbers; the
-architectural bottlenecks below are the same regardless of where the process runs).
+Full methodology, before/after tables, and the plot: [`docs/SCALE.md`](SCALE.md)
+(measured on a dev machine with deterministic synthetic embeddings, not on the live FC
+instance itself — read that doc's methodology section before treating these as
+FC-specific numbers; the architectural bottlenecks/fixes below are the same regardless
+of where the process runs). **Update:** the three scale walls this section originally
+described (DB reload on every `recall()`, an O(n²) unkeyed-insert path, per-call
+synchronous commits) are now FIXED — `docs/SCALE.md`'s before/after table has the
+numbers; summary below.
 
 - **The live deploy's memory store is `/tmp/tenet.db` on FC's ephemeral filesystem**
   (see "Current status" above) — every fact ever ingested during that instance's
-  lifetime lives in that one sqlite file, rebuilt into an in-memory matrix on *every*
-  `recall()` call (no caching — `docs/SCALE.md` "cold vs warm"). For a hackathon demo
-  session (tens to low hundreds of facts), this is comfortably sub-second; nothing in
-  this deploy's traffic pattern gets near the walls below.
-- **Recall crosses 100ms around 10k facts and 1s around 100k facts** on the reference
-  hardware measured in `docs/SCALE.md` — a live demo session driven by judges clicking
-  around would need to ingest ~10,000+ facts in one FC instance's warm lifetime before
-  this becomes noticeable, which isn't a realistic demo-traffic pattern.
-- **The tighter constraint for THIS deploy specifically is FC's own memory ceiling**,
-  not Tenet's asymptotic RAM growth: the function was created with `memorySize=512`
-  (512MB) — `docs/SCALE.md` measured ~1.15GB RSS at 100,000 facts (already over that
-  limit) and extrapolates to ~7.8GB at 1M. A single FC instance accumulating anywhere
-  near 100k facts in one warm lifetime would hit FC's memory cap and get OOM-killed
-  well before Tenet's own read-latency wall arrives. Bumping `memorySize` (FC supports
-  up to 32GB) defers this but doesn't remove it — the underlying fix is the resident/
-  incremental matrix + batched-commit work `docs/SCALE.md`'s verdict section
-  recommends, not a bigger instance.
+  lifetime lives in that one sqlite file. As of this fix, the embedding matrix + bi-
+  temporal metadata are RESIDENT in the process (`src/tenet/index.py`) and updated
+  incrementally, not rebuilt from sqlite on every `recall()` call. For a hackathon demo
+  session (tens to low hundreds of facts) this was always comfortably sub-second
+  either way; the fix matters once a session's ledger grows past ~10k facts, where it
+  used to get noticeably slow and now doesn't.
+- **Recall no longer crosses 100ms/1s anywhere in the measured range (up to 100k
+  facts)** — flat at ~9-12ms, dominated by the embedder's fixed per-query cost, not
+  store size. Ingest throughput (the write path — `learn`/`ingest`/`/ingest`) went
+  from a confirmed O(n)-per-insert collapse (13.3 facts/s at 100k) to near-flat
+  (7,441 facts/s at 100k) — a live demo session driven by judges is nowhere near
+  either wall now, same as before, but by a much wider margin.
+- **The tighter constraint for THIS deploy specifically is STILL FC's own memory
+  ceiling**, unchanged in kind, slightly worse in magnitude: the function was created
+  with `memorySize=512` (512MB) — `docs/SCALE.md` now measures ~1.4GB RSS at 100,000
+  facts (already over that limit, was ~1.15GB before the fix — more is resident now,
+  the honest tradeoff for the latency/throughput wins) and extrapolates to ~8.7GB at
+  1M. A single FC instance accumulating anywhere near 100k facts in one warm lifetime
+  would still hit FC's memory cap and get OOM-killed — RAM was always the deeper wall
+  under the latency/throughput ones this pass fixed, and remains the honest ceiling.
+  Bumping `memorySize` (FC supports up to 32GB) defers this; a capacity-bounded
+  resident set (LRU-evict cold rows) is the next lever if it's ever needed for real
+  (`docs/SCALE.md`'s revised verdict) — not built here, not needed at demo/launch
+  scale.
 - **Ephemeral `/tmp` means this is moot for LONG-lived scale anyway**: a cold start
   wipes the store, so no single FC instance's memory grows unbounded across restarts
   regardless of traffic — durable scale (surviving cold starts at real volume) needs
   the OSS snapshot/restore path (`src/tenet/alicloud_oss.py`) wired in, which is also
   currently not done (OSS not activated for this account — see "Current status").
+- **Multi-process correctness**: this FC deploy runs a single worker process today, so
+  the multi-process staleness guard (`docs/SCALE.md` "correctness guards") isn't
+  exercised in production here — but it's implemented and directly tested (not just
+  documented) for the case where a future deploy scales to multiple concurrent
+  workers sharing one sqlite file.
