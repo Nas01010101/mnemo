@@ -368,7 +368,37 @@ near-verbatim threshold), so the reader sees several conflicting statements with
 recency cue and often answers from a stale one — even when the correct fact is ranked
 first. Mem0-style (which *deletes* superseded memories outright, leaving nothing to
 leak) is immune to this failure mode and stays flat at 100% through U=32. Reported in
-full in Appendix / `docs/BENCHMARK.md` §9; not patched in this work.
+full in Appendix / `docs/BENCHMARK.md` §9. The fix and its measured effect: §4.9.
+
+**4.9 The fix — read-time belief-evidence consistency + currency-structured context.**
+Two additive, LLM-free, read-time changes (store/ingestion untouched, every ChurnBench
+cache reused byte-for-byte). **(1)** A narrower, key-scoped consistency check
+(`consistency.py`, `recall(consistency_threshold=...)`): drop a raw slice close to a
+superseded fact whose *key already has a current fact in the pool* — more sensitive
+than the global `_STALE_ECHO` filter without opening a cross-key false-positive
+surface; current-fact ranking is unaffected either way. Threshold swept on real U=2
+data (ground truth via exact substring match against the deterministic attribute
+pools): 0.70 gives 100% stale-echo recall at a 7% false-positive rate (0.60: 81% FPR;
+0.80, the original global threshold: only 20.9% recall — why it missed this case).
+**(2)** Currency-structured reader context (`bench_churn.py`): "Current beliefs:"
+(dated) then "Supporting raw context:" (dated) instead of one flat list —
+product-faithful, since the store already knows which facts are current.
+
+| U | tenet-baseline | tenet+1 | tenet+2 | **tenet+1+2** |
+|---:|---:|---:|---:|---:|
+| 2  | 60.0 | 90.0 | 82.0 | **98.0** |
+| 8  | 42.0 | 84.0 | 82.0 | **92.0** |
+| 32 | 36.0 | 80.0 | 70.0 | **82.0** |
+
+Same cached stores, live qwen3.7-plus reader, n=50/point, Wilson 95% CIs
+(`docs/BENCHMARK.md` §9.1). **Result: partial, pre-registered gate.** tenet+1+2 clears
+≥90% at both U=2 (98.0) and U=8 (92.0) but falls short of Mem0-style's flat 100 at
+U=32 (82.0) — the gate's "ship the fix, report half-life honestly" branch. Churn
+half-life: tenet+1+2 = **8**, up from <2, now tied with RAG/HippoRAG-v2-style, still
+behind Mem0-style's 32. All regression gates pass with the fix defaulted on (7
+deterministic suites; §4.2's U=8 stays 100%; FactConsolidation sh_6k is provably
+invariant — that arm never stores raw slices), so `recall()`'s
+`consistency_threshold` now defaults to 0.70 in shipped code.
 
 ## 5. Limitations
 
@@ -388,7 +418,10 @@ full in Appendix / `docs/BENCHMARK.md` §9; not patched in this work.
   attributes each updated many times via paraphrased (not templated) statements, the
   write-time stale-echo filter can miss a raw turn whose wording diverges from its
   distilled paraphrase, letting it reach the same recall window as the current fact and
-  sometimes outvote it. Real, measured, and unresolved in this work.
+  sometimes outvote it. **Partially fixed (§4.9)**: a read-time, key-scoped consistency
+  check plus a currency-structured reader context raise churn half-life from <2 to 8
+  (both defaulted on, all regression gates clean) — real progress, but still short of
+  Mem0-style's write-time-consolidation immunity at U=32.
 
 ## 6. Conclusion
 

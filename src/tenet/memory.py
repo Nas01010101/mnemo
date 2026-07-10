@@ -18,6 +18,7 @@ Zero heavy deps: sqlite (stdlib) + numpy. Brute-force cosine — fine at hackath
 from __future__ import annotations
 
 import math
+import os
 import sqlite3
 import threading
 import time
@@ -27,16 +28,38 @@ from pathlib import Path
 import numpy as np
 
 from . import config
+from .consistency import stale_raw_ids
 from .dynamics import Dynamics
 from .navigate import navigate as _navigate
 
-_DEFAULT_DB = Path(__file__).resolve().parent.parent.parent / "data" / "tenet.db"
+# TENET_DB_PATH lets callers (tests, mcp_server's module-level default Tenet())
+# redirect the default db off data/ when that symlink target isn't reachable
+# (e.g. an external volume TCC-blocks this process — see BENCHMARK.md §9).
+_DEFAULT_DB = Path(os.environ["TENET_DB_PATH"]) if os.environ.get("TENET_DB_PATH") else (
+    Path(__file__).resolve().parent.parent.parent / "data" / "tenet.db")
 
 # Forgetting knobs
 _HALFLIFE_S = 14 * 24 * 3600  # a memory's recency weight halves every 14 days
 _FORGET_THRESHOLD = 0.15      # decay score below this -> archived by the sweep
 _STALE_ECHO = 0.80            # a raw slice this similar to a superseded fact is stale
 _REPLAY_LAMBDA = 0.5          # recursive recall: weight of the evidence pool in the cue
+# Read-time belief-evidence consistency (consistency.py, ChurnBench §9 fix,
+# component 1) — key-scoped, catches paraphrased echoes _STALE_ECHO misses.
+# 0.70: swept on REAL ChurnBench U=2 data (0.60/0.70/0.80 — 100% stale-echo
+# recall / 7% false-positive rate at 0.70, dominating both alternatives) and
+# defaulted ON because ALL regression gates passed (BENCHMARK.md §9.1: 7
+# deterministic suites, bench_horizon U=8 stayed 100%, FC sh_6k proved
+# structurally invariant — that arm never stores kind='raw' rows). Override
+# with TENET_CONSISTENCY_DEFAULT="off" (or any non-numeric value) to force it
+# off if a future regression appears; pass consistency_threshold=None
+# per-call to opt out for a single call.
+_CONSISTENCY_ENV = os.environ.get("TENET_CONSISTENCY_DEFAULT")
+if _CONSISTENCY_ENV is None:
+    _CONSISTENCY_THRESHOLD_DEFAULT: float | None = 0.70
+elif _CONSISTENCY_ENV.replace(".", "", 1).isdigit():
+    _CONSISTENCY_THRESHOLD_DEFAULT = float(_CONSISTENCY_ENV)
+else:
+    _CONSISTENCY_THRESHOLD_DEFAULT = None
 
 
 @dataclass
@@ -205,6 +228,7 @@ class MemoryCore:
         as_of: float | None = None,
         expand: int = 0,
         hops: int = 0,
+        consistency_threshold: float | None = _CONSISTENCY_THRESHOLD_DEFAULT,
     ) -> list[Memory]:
         """Most relevant memories, ranked by relevance × decay.
 
@@ -228,6 +252,17 @@ class MemoryCore:
         later round can reach a session the raw query never surfaced (the associative
         hop a multi-session question needs). Selection stays read-only, LLM-free, and
         subject to the same stale-echo filter; callers keep the token budget cap.
+
+        `consistency_threshold` — read-time belief-evidence consistency (component 1
+        of the ChurnBench §9 fix, consistency.py). Defaults to
+        `_CONSISTENCY_THRESHOLD_DEFAULT` (0.70, on — see that constant's comment for
+        the regression-gate history); pass None to leave the raw pool as-is beyond
+        the global `_STALE_ECHO` filter below. A float drops any raw slice whose
+        embedding is close (cosine >= threshold) to a SUPERSEDED fact of a key whose
+        CURRENT fact is already ranked in the top-k facts for this query — i.e. we
+        already know the current value for that key, so a close paraphrase of an old
+        one is confirmed-stale, not just embedding-adjacent. Only affects which raw
+        slices are eligible; current-fact ranking is byte-identical with this on or off.
         """
         qv = self._embed(query)  # network call — kept outside the lock
         with self._lock:
@@ -268,17 +303,33 @@ class MemoryCore:
             # can't reintroduce an outdated value. (Only for current recall, not as_of.)
             expired = self._expired_fact_matrix() if as_of is None else None
 
-            def _fresh(row) -> bool:
-                if expired is None:
-                    return True
-                emb = np.frombuffer(row["embedding"], dtype=np.float32)
-                return float(np.max(expired @ emb)) < _STALE_ECHO
-
             # Dual-pool selection: distilled facts win on consistency/temporal, raw
             # slices win on verbatim detail (durations, numbers). Guarantee raw slices
             # a share of the budget so distillation can't crowd out the exact answer —
             # but if one pool is empty, the other fills all k slots (no starvation).
             facts = [(rank, row) for rank, _rel, row in scored if row["kind"] != "raw"]
+
+            # Read-time belief-evidence consistency (component 1, consistency.py):
+            # key-scoped, computed only when requested (default off — see recall()'s
+            # docstring). Does not touch `facts`/`scored`, so current-fact ranking is
+            # unaffected either way; only raw-slice eligibility (_fresh) changes.
+            stale_ids: set[int] = set()
+            if consistency_threshold is not None and as_of is None:
+                pool_keys = {row["skey"] for _rank, row in facts[:k] if row["skey"]}
+                if pool_keys:
+                    stale_ids = stale_raw_ids(
+                        [row for row in rows if row["kind"] == "raw"],
+                        self._expired_keyed_rows(), pool_keys, consistency_threshold,
+                    )
+
+            def _fresh(row) -> bool:
+                if row["id"] in stale_ids:
+                    return False
+                if expired is None:
+                    return True
+                emb = np.frombuffer(row["embedding"], dtype=np.float32)
+                return float(np.max(expired @ emb)) < _STALE_ECHO
+
             raws = [(rel, row) for _rank, rel, row in scored
                     if row["kind"] == "raw" and _fresh(row)]
             n_raw = min(len(raws), k // 2)
@@ -517,6 +568,15 @@ class MemoryCore:
         if not rows:
             return None
         return np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+
+    def _expired_keyed_rows(self):
+        """Superseded KEYED facts (id, skey, embedding) — consistency.py's key-scoped
+        input; a superset of `_expired_fact_matrix`'s rows filtered to skey IS NOT NULL,
+        fetched separately since that helper only returns bare embeddings."""
+        return self.db.execute(
+            "SELECT id, skey, embedding FROM memories WHERE kind='fact' "
+            "AND expired_at IS NOT NULL AND skey IS NOT NULL AND archived=0"
+        ).fetchall()
 
     def _nearest_current(self, vec: np.ndarray):
         best = None

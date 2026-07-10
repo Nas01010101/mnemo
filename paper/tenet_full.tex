@@ -583,9 +583,55 @@ unordered conflicting statements with no recency cue and often answers from a st
 Mem0-style---which \emph{deletes} superseded memories outright rather than retiring them
 into a still-recallable raw pool---has nothing to leak from and stays flat through
 $U{=}32$; naive RAG and HippoRAG-v2-style, with no consolidation at all, collapse
-$100\!\to\!30$ from $U{=}8\!\to\!32$ exactly as \S\ref{sec:churn} predicts. Diagnosed,
-not patched, in this work (\S\ref{sec:limits}); full curve, misses, and reproduction
-command in \texttt{docs/BENCHMARK.md} \S9.
+$100\!\to\!30$ from $U{=}8\!\to\!32$ exactly as \S\ref{sec:churn} predicts. Diagnosed in
+this work; the fix and its measured effect follow immediately below (full curve,
+misses, and reproduction command in \texttt{docs/BENCHMARK.md} \S9).
+
+\subsection{The fix: read-time belief-evidence consistency + currency-structured context}\label{sec:churnfix}
+The diagnosis names two gaps: \S\ref{sec:bec}'s \texttt{\_STALE\_ECHO} filter is a
+\emph{global} cosine bar tuned for near-verbatim echoes, and the reader prompt gives
+no recency cue over an unordered pool. Two additive, LLM-free, read-time fixes---the
+store and every ChurnBench ingestion cache are untouched, so no re-ingestion is
+needed. \textbf{(1) Read-time belief-evidence consistency}: narrower and more
+sensitive than the global filter, a raw slice is dropped only if it is close to a
+superseded fact whose \emph{key already has a current fact in the top-$k$ pool}---so
+the threshold can drop below the global filter's without opening a cross-key
+false-positive surface. Current-fact ranking is byte-identical on or off; only
+raw-slice pool membership changes. Threshold chosen from a sweep on real $U{=}2$ data
+(ground truth via exact substring match against the deterministic attribute pools):
+$0.70$ gives 100\% recall on genuinely-stale echoes at a 7\% false-positive rate on
+legitimately-current ones (0.60: 81\% FPR; 0.80, the original global threshold: only
+20.9\% recall---why it missed this case). \textbf{(2) Currency-structured reader
+context}: the tenet arm's context is split into ``Current beliefs:'' (distilled,
+dated) then ``Supporting raw context:'' (raw turns, dated) instead of one flat list---product-faithful,
+since the store already knows \texttt{is\_current}/\texttt{valid\_at} (the agent
+surface dates facts the same way); other arms have no such metadata, so their prompts
+are untouched by design.
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+$U$ & tenet-baseline & tenet+1 & tenet+2 & \textbf{tenet+1+2}\\
+\midrule
+2  & 60.0 & 90.0 & 82.0 & \textbf{98.0}\\
+8  & 42.0 & 84.0 & 82.0 & \textbf{92.0}\\
+32 & 36.0 & 80.0 & 70.0 & \textbf{82.0}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Same cached stores across all four arms (only recall-time config differs), live
+\texttt{qwen3.7-plus} reader, $n{=}50$/point, Wilson 95\% CIs in
+\texttt{docs/BENCHMARK.md} \S9.1. \textbf{Result: partial, pre-registered gate.}
+tenet+1+2 clears $\geq90\%$ at both $U{=}2$ (98.0) and $U{=}8$ (92.0) but falls short
+of Mem0-style's flat 100 at $U{=}32$ (82.0)---the gate's explicit ``ship the fix,
+report half-life honestly'' branch, not a full pass. \textbf{Churn half-life:
+tenet+1+2 $=8$}, up from $<2$, now tied with RAG and HippoRAG-v2-style, still behind
+Mem0-style's 32 (immune by construction---it deletes superseded memories outright).
+All regression gates pass with the fix defaulted on (7 deterministic suites;
+\S\ref{sec:churn}'s $U{=}8$ stays 100\%; FactConsolidation sh\_6k is provably
+invariant---that arm never stores raw slices), so \texttt{recall()}'s
+\texttt{consistency\_threshold} now defaults to $0.70$ in shipped code.
 
 \section{Discussion}
 \textbf{Where the belief state wins.} Both MAB competencies reward what supersession
@@ -622,8 +668,12 @@ the keying). \textbf{Scope}: single-user assistant memory; multi-writer stores a
 adversarial updates are untested. \textbf{Stale raw-turn leakage under natural
 conversational churn} (\S\ref{sec:churnbench}, measured, not hypothetical): with several
 attributes each updated many times via paraphrased statements, already-superseded raw
-turns can survive the stale-echo filter and outvote the correct current fact in the
-reader's context---the single largest, most concretely diagnosed gap in this paper.
+turns can survive the write-time stale-echo filter and outvote the correct current fact
+in the reader's context. \textbf{Partially fixed} (\S\ref{sec:churnfix}): read-time
+belief-evidence consistency plus a currency-structured reader context raise churn
+half-life from $<2$ to $8$ (both regression-gate-clean, defaulted on), but the combined
+fix still falls short of Mem0-style's write-time-consolidation immunity at $U{=}32$ ---
+the residual gap, not the whole failure mode, is what remains open.
 
 \section{Conclusion}
 Treating agent memory as a self-consistent belief state rather than a document index

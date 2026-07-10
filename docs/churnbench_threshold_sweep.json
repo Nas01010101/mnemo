@@ -1,0 +1,45 @@
+{
+  "method": "REAL ChurnBench U=2 data (10 principals, n_facts=5, distractor_sessions=4, seed=1) \u2014 cosine(raw slice, nearest superseded fact of the same attribute), labeled by exact substring match against churnbench_data.py pools (ground truth).",
+  "n_stale": 43,
+  "n_current": 43,
+  "stale_sims_stats": {
+    "min": 0.7178386449813843,
+    "max": 0.9004700183868408,
+    "mean": 0.7849172034928965,
+    "median": 0.7761396765708923
+  },
+  "current_sims_stats": {
+    "min": 0.5394420027732849,
+    "max": 0.7359539270401001,
+    "mean": 0.6394025919049285,
+    "median": 0.6385053992271423
+  },
+  "sweep": {
+    "0.6": {
+      "stale_recall": 1.0,
+      "current_fpr": 0.813953488372093
+    },
+    "0.65": {
+      "stale_recall": 1.0,
+      "current_fpr": 0.4418604651162791
+    },
+    "0.7": {
+      "stale_recall": 1.0,
+      "current_fpr": 0.06976744186046512
+    },
+    "0.72": {
+      "stale_recall": 0.9767441860465116,
+      "current_fpr": 0.023255813953488372
+    },
+    "0.74": {
+      "stale_recall": 0.9069767441860465,
+      "current_fpr": 0.0
+    },
+    "0.8": {
+      "stale_recall": 0.20930232558139536,
+      "current_fpr": 0.0
+    }
+  },
+  "chosen_threshold": 0.7,
+  "rationale": "100% stale-echo recall, 7% false-positive rate on legitimately-current raw echoes (the FP cost is low: the distilled CURRENT fact is unaffected either way; only a supplementary raw duplicate is dropped). Dominates 0.60 (81% FPR) and 0.80 (only 20.9% recall, matching the original _STALE_ECHO failure this component fixes)."
+}

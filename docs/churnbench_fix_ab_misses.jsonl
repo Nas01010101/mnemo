@@ -1,0 +1,151 @@
+{"u": 2, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "chief designer", "pred": "principal engineer"}
+{"u": 2, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Westside", "pred": "Equinox Eastside"}
+{"u": 2, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Westside", "pred": "Equinox Eastside"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Subaru Forester", "pred": "Jaguar F-Pace"}
+{"u": 2, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Subaru Forester", "pred": "Jaguar F-Pace"}
+{"u": 2, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 16", "pred": "Galaxy S 12"}
+{"u": 2, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "senior analyst", "pred": "principal strategist"}
+{"u": 2, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "senior analyst", "pred": "principal strategist"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Buick Enclave"}
+{"u": 2, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "iPhone 15", "pred": "OnePlus 15"}
+{"u": 2, "attr": "phone", "variant": "tenet+2", "question": "What phone does the user currently use?", "gold": "iPhone 15", "pred": "OnePlus 15"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Hyundai Elantra", "pred": "Land Rover Defender"}
+{"u": 2, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Hyundai Elantra", "pred": "Land Rover Defender"}
+{"u": 2, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "principal consultant", "pred": "junior analyst"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Nissan Altima", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Nissan Altima", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Nissan Altima", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Nissan Altima", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Anytime Fitness Eastside", "pred": "Blink Fitness Midtown"}
+{"u": 2, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Anytime Fitness Eastside", "pred": "Blink Fitness Midtown"}
+{"u": 2, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "staff designer", "pred": "principal engineer"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Ram 1500", "pred": "Jeep Wrangler"}
+{"u": 2, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "OnePlus 12", "pred": "Pixel 16"}
+{"u": 2, "attr": "phone", "variant": "tenet+2", "question": "What phone does the user currently use?", "gold": "OnePlus 12", "pred": "Pixel 16"}
+{"u": 2, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "iPhone 11", "pred": "iPhone 10"}
+{"u": 2, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "iPhone 11", "pred": "iPhone 15"}
+{"u": 2, "attr": "phone", "variant": "tenet+2", "question": "What phone does the user currently use?", "gold": "iPhone 11", "pred": "iPhone 15"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Jeep Wrangler"}
+{"u": 2, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Jeep Wrangler"}
+{"u": 2, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "associate consultant", "pred": "principal strategist"}
+{"u": 2, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "associate consultant", "pred": "principal strategist"}
+{"u": 2, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Kia Sportage", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Kia Sportage", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Kia Sportage", "pred": "Mitsubishi Outlander"}
+{"u": 2, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Midtown", "pred": "Planet Fitness Eastside"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Volvo XC60", "pred": "GMC Sierra"}
+{"u": 8, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Downtown", "pred": "Equinox Eastside"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Subaru Forester"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Subaru Forester"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Subaru Forester"}
+{"u": 8, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Genesis G70"}
+{"u": 8, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Uptown", "pred": "Life Time Downtown"}
+{"u": 8, "attr": "gym", "variant": "tenet+1", "question": "Which gym does the user currently go to?", "gold": "LA Fitness Uptown", "pred": "Life Time Downtown"}
+{"u": 8, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Chicago", "pred": "Guangzhou"}
+{"u": 8, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "junior strategist", "pred": "principal analyst"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Toyota Prius", "pred": "Subaru Outback"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Toyota Prius", "pred": "Kia Sportage"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Xperia 15", "pred": "OnePlus 12"}
+{"u": 8, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Bogota", "pred": "Osaka"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Subaru Forester", "pred": "Land Rover Defender"}
+{"u": 8, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "CrossFit Central Midtown", "pred": "Blink Fitness Westside"}
+{"u": 8, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Delhi", "pred": "Seoul"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "staff consultant", "pred": "associate designer"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Honda Civic", "pred": "Jeep Wrangler"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Honda Civic", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Honda Civic", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Honda Civic", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Westside", "pred": "Blink Fitness Westside"}
+{"u": 8, "attr": "gym", "variant": "tenet+1", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Westside", "pred": "Equinox Uptown"}
+{"u": 8, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Westside", "pred": "Blink Fitness Westside"}
+{"u": 8, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Delhi", "pred": "Toronto"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "lead designer", "pred": "chief analyst"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Ram 1500", "pred": "Dodge Charger"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Ram 1500", "pred": "Infiniti Q50"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Ram 1500", "pred": "Infiniti Q50"}
+{"u": 8, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Ram 1500", "pred": "Infiniti Q50"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "iPhone 16", "pred": "OnePlus 13"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "lead designer", "pred": "principal analyst"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Ford F-150", "pred": "Jeep Wrangler"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Ford F-150", "pred": "Jeep Wrangler"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 17", "pred": "iPhone 13"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "lead analyst", "pred": "head engineer"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 14", "pred": "Galaxy S 10"}
+{"u": 8, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Gold's Gym Midtown", "pred": "CrossFit Central Westside"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "head analyst", "pred": "chief strategist"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Mazda CX-5", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Mazda CX-5", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Mazda CX-5", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Mazda CX-5", "pred": "Chrysler Pacifica"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "iPhone 11", "pred": "Xperia 16"}
+{"u": 8, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "principal designer", "pred": "senior strategist"}
+{"u": 8, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "BMW 3 Series"}
+{"u": 8, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Toyota Prius"}
+{"u": 8, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Chevrolet Malibu", "pred": "Toyota Prius"}
+{"u": 8, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Xperia 15", "pred": "OnePlus 10"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Delhi", "pred": "Bogota"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "junior consultant", "pred": "lead designer"}
+{"u": 32, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "junior consultant", "pred": "staff consultant"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Porsche 911", "pred": "Subaru Forester"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 14", "pred": "Galaxy S 12"}
+{"u": 32, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Westside", "pred": "Life Time Downtown"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "head analyst", "pred": "chief analyst"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Jaguar F-Pace", "pred": "Kia Sportage"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Jaguar F-Pace", "pred": "Kia Sportage"}
+{"u": 32, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Jaguar F-Pace", "pred": "Kia Sportage"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Pixel 17", "pred": "Pixel 10"}
+{"u": 32, "attr": "phone", "variant": "tenet+1", "question": "What phone does the user currently use?", "gold": "Pixel 17", "pred": "Pixel 10"}
+{"u": 32, "attr": "phone", "variant": "tenet+2", "question": "What phone does the user currently use?", "gold": "Pixel 17", "pred": "Pixel 10"}
+{"u": 32, "attr": "phone", "variant": "tenet+1+2", "question": "What phone does the user currently use?", "gold": "Pixel 17", "pred": "Pixel 10"}
+{"u": 32, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Midtown", "pred": "Equinox Downtown"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Tokyo", "pred": "Karachi"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "associate designer", "pred": "senior engineer"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Acura TLX", "pred": "Cadillac Escalade"}
+{"u": 32, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Acura TLX", "pred": "Cadillac Escalade"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 10", "pred": "OnePlus 15"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Guangzhou", "pred": "Kinshasa"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "chief designer", "pred": "senior analyst"}
+{"u": 32, "attr": "job_title", "variant": "tenet+1", "question": "What is the user's current job title?", "gold": "chief designer", "pred": "senior analyst"}
+{"u": 32, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "chief designer", "pred": "senior analyst"}
+{"u": 32, "attr": "job_title", "variant": "tenet+1+2", "question": "What is the user's current job title?", "gold": "chief designer", "pred": "senior analyst"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Mitsubishi Outlander", "pred": "Alfa Romeo Giulia"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Mitsubishi Outlander", "pred": "Cadillac Escalade"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Mitsubishi Outlander", "pred": "Cadillac Escalade"}
+{"u": 32, "attr": "phone", "variant": "tenet+2", "question": "What phone does the user currently use?", "gold": "Pixel 10", "pred": "OnePlus 15"}
+{"u": 32, "attr": "gym", "variant": "tenet-baseline", "question": "Which gym does the user currently go to?", "gold": "Anytime Fitness Downtown", "pred": "Gold's Gym Uptown"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Kolkata", "pred": "Chongqing"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Alfa Romeo Giulia", "pred": "Dodge Charger"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Alfa Romeo Giulia", "pred": "Ford F-150"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Alfa Romeo Giulia", "pred": "Ford F-150"}
+{"u": 32, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Alfa Romeo Giulia", "pred": "Ford F-150"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Galaxy S 10", "pred": "Galaxy S 12"}
+{"u": 32, "attr": "phone", "variant": "tenet+1+2", "question": "What phone does the user currently use?", "gold": "Galaxy S 10", "pred": "Galaxy S 11"}
+{"u": 32, "attr": "gym", "variant": "tenet+1", "question": "Which gym does the user currently go to?", "gold": "Life Time Midtown", "pred": "Life Time Downtown"}
+{"u": 32, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Life Time Midtown", "pred": "CrossFit Central Westside"}
+{"u": 32, "attr": "gym", "variant": "tenet+1+2", "question": "Which gym does the user currently go to?", "gold": "Life Time Midtown", "pred": "Life Time Downtown"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Tokyo", "pred": "Chongqing"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Tesla Model 3"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Tesla Model 3"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Tesla Model 3"}
+{"u": 32, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Tesla Model 3"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Beijing", "pred": "Guangzhou"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "lead consultant", "pred": "senior engineer"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Jaguar F-Pace", "pred": "Chevrolet Bolt"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Xperia 10", "pred": "Xperia 16"}
+{"u": 32, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Planet Fitness Westside", "pred": "Planet Fitness Eastside"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Bogota", "pred": "Wuhan"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "associate strategist", "pred": "senior consultant"}
+{"u": 32, "attr": "job_title", "variant": "tenet+2", "question": "What is the user's current job title?", "gold": "associate strategist", "pred": "senior consultant"}
+{"u": 32, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Equinox Eastside", "pred": "Life Time Eastside"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Mexico City", "pred": "Sao Paulo"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "associate consultant", "pred": "head consultant"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Dodge Charger"}
+{"u": 32, "attr": "car", "variant": "tenet+1", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Toyota Camry"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Audi A4"}
+{"u": 32, "attr": "car", "variant": "tenet+1+2", "question": "What car does the user currently drive?", "gold": "Mazda3", "pred": "Toyota Camry"}
+{"u": 32, "attr": "residence", "variant": "tenet-baseline", "question": "Which city does the user currently live in?", "gold": "Seoul", "pred": "Wuhan"}
+{"u": 32, "attr": "job_title", "variant": "tenet-baseline", "question": "What is the user's current job title?", "gold": "head strategist", "pred": "senior consultant"}
+{"u": 32, "attr": "car", "variant": "tenet-baseline", "question": "What car does the user currently drive?", "gold": "Volkswagen Golf", "pred": "Chrysler Pacifica"}
+{"u": 32, "attr": "car", "variant": "tenet+2", "question": "What car does the user currently drive?", "gold": "Volkswagen Golf", "pred": "Chrysler Pacifica"}
+{"u": 32, "attr": "phone", "variant": "tenet-baseline", "question": "What phone does the user currently use?", "gold": "Pixel 16", "pred": "OnePlus 11"}
+{"u": 32, "attr": "gym", "variant": "tenet+2", "question": "Which gym does the user currently go to?", "gold": "Equinox Downtown", "pred": "Blink Fitness Downtown"}

@@ -193,6 +193,42 @@ def answer_natural(context: str, question: str) -> str:
         qwen_default=config.get("QWEN_ANSWER_MODEL", "qwen3.7-plus"), max_tokens=32)
 
 
+def _fmt_age(seconds: float) -> str:
+    days = seconds / 86400.0
+    return "<1d ago" if days < 1 else f"{days:.0f}d ago"
+
+
+def format_tenet_context(hits, now: float, currency: bool = False) -> str:
+    """Render tenet's recalled memories as reader context (component 2 of the
+    ChurnBench §9 fix).
+
+    currency=False (default, unchanged behaviour): flat bullet list, no
+    ordering/recency cue — this is what produced the §9 falsification.
+
+    currency=True: split into "Current beliefs:" (distilled, current facts)
+    then "Supporting raw context:" (raw verbatim turns), each dated. Tenet's
+    store KNOWS which facts are current and when each was learned/valid
+    (is_current, valid_at); surfacing that structure to the reader is
+    product-faithful — the agent surface already dates/caveats facts the same
+    way (tenet/agent.py's _format_memories + _fmt_age) — not benchmark-tuning.
+    Other arms (RAG/mem0/hipporag) have no such metadata to present, so their
+    prompts are deliberately left untouched — that asymmetry IS the design
+    difference §9 measures.
+    """
+    if not currency:
+        return "\n".join(f"- {h.text}" for h in hits)
+    beliefs = [h for h in hits if h.kind != "raw"]
+    raw = [h for h in hits if h.kind == "raw"]
+    parts = []
+    if beliefs:
+        lines = "\n".join(f"- {h.text} ({_fmt_age(now - h.valid_at)})" for h in beliefs)
+        parts.append(f"Current beliefs:\n{lines}")
+    if raw:
+        lines = "\n".join(f"- {h.text} ({_fmt_age(now - h.valid_at)})" for h in raw)
+        parts.append(f"Supporting raw context:\n{lines}")
+    return "\n\n".join(parts)
+
+
 # --------------------------------------------------------------------------
 # Ingestion / index builders (cached under data/cache/churn/<seed>/)
 # --------------------------------------------------------------------------
@@ -251,7 +287,8 @@ def _job(job):
 
 
 def run_dataset(ds: dict, arms: list[str], k: int, cache_dir: Path, host_embedder,
-                 tenet_workers: int) -> tuple[dict, list[dict]]:
+                 tenet_workers: int, consistency_threshold: float | None = None,
+                 currency_context: bool = False) -> tuple[dict, list[dict]]:
     """Build every requested arm's index for one dataset, answer every question,
     return {arm: [(ok:bool|None, pred, gold, question)]} and miss records."""
     facts = ds["facts"]
@@ -287,8 +324,8 @@ def run_dataset(ds: dict, arms: list[str], k: int, cache_dir: Path, host_embedde
             pool = "\n".join(texts[i] for i in top)
             jobs.append(("rag", qi, question, gold, pool))
         if "tenet" in arms:
-            hits = m_tenet.core.recall(question, k=k)
-            ctx = "\n".join(f"- {h.text}" for h in hits)
+            hits = m_tenet.core.recall(question, k=k, consistency_threshold=consistency_threshold)
+            ctx = format_tenet_context(hits, m_tenet.core._now(), currency=currency_context)
             jobs.append(("tenet", qi, question, gold, ctx))
         if "mem0" in arms:
             mems, mvecs = ing_mem0
@@ -339,6 +376,13 @@ def main() -> int:
     ap.add_argument("--principal-workers", type=int, default=4,
                     help="how many principals' datasets to build+read concurrently "
                          "(total in-flight API calls ~= this * --workers)")
+    ap.add_argument("--consistency-threshold", type=float, default=None,
+                    help="tenet arm only: component 1 of the §9 fix (consistency.py). "
+                         "None (default) = off, matching the §9-measured baseline.")
+    ap.add_argument("--currency-context", action="store_true",
+                    help="tenet arm only: component 2 of the §9 fix — structure the "
+                         "reader context as 'Current beliefs:' / 'Supporting raw "
+                         "context:' instead of a flat unordered list.")
     args = ap.parse_args()
 
     sweep = [int(x) for x in args.updates.split(",")]
@@ -368,7 +412,9 @@ def main() -> int:
         with ThreadPoolExecutor(max_workers=args.principal_workers) as ex:
             for pi, (results, misses) in enumerate(
                     ex.map(lambda ds: run_dataset(ds, arms, args.k, cache_dir,
-                                                  host_embedder, args.workers), datasets)):
+                                                  host_embedder, args.workers,
+                                                  args.consistency_threshold,
+                                                  args.currency_context), datasets)):
                 for a in arms:
                     for r in results[a]:
                         if r is None:
