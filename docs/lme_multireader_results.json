@@ -1,0 +1,105 @@
+{
+ "run": "LME_S n=40 seed=0 k=10; THREE frontier readers over IDENTICAL captured tasks (subscription CLIs: Claude subagents / codex gpt-5.5 / agy Gemini 3.5 Flash High); judge=qwen3.7-plus for all; distiller=qwen3.6-flash; embedder=bge-small; 2026-07-11",
+ "note": "CIs overlap per-cell at n=40; the evidence is the 6/6 directional replication across reader families. Batched-CLI harness caveat applies to all readers equally.",
+ "arms": {
+  "rag": {
+   "acc": 82.5,
+   "ci": [
+    68.0,
+    91.3
+   ],
+   "n": 40,
+   "avg_reader_tokens": 2153,
+   "acc_per_1k": 38.3,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 50.0,
+    "single-session-assistant": 100.0,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 76.9
+   }
+  },
+  "tenet_eff": {
+   "acc": 90.0,
+   "ci": [
+    76.9,
+    96.0
+   ],
+   "n": 40,
+   "avg_reader_tokens": 1186,
+   "acc_per_1k": 75.9,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 75.0,
+    "single-session-assistant": 100.0,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 84.6
+   }
+  },
+  "tenet_par": {
+   "acc": 90.0,
+   "ci": [
+    76.9,
+    96.0
+   ],
+   "n": 40,
+   "avg_reader_tokens": 2143,
+   "acc_per_1k": 42.0,
+   "per_type": {
+    "knowledge-update": 100.0,
+    "multi-session": 87.5,
+    "single-session-assistant": 83.3,
+    "single-session-preference": 100.0,
+    "single-session-user": 100.0,
+    "temporal-reasoning": 84.6
+   }
+  }
+ },
+ "excluded": 0,
+ "readers": {
+  "sonnet-5": {
+   "rag": 82.5,
+   "tenet_eff": 90.0,
+   "tenet_par": 90.0,
+   "acc1k": {
+    "rag": 38.3,
+    "tenet_eff": 75.9,
+    "tenet_par": 42.0
+   }
+  },
+  "gpt-5.5": {
+   "rag": 77.5,
+   "tenet_eff": 85.0,
+   "tenet_par": 82.5,
+   "acc1k": {
+    "rag": 36.0,
+    "tenet_eff": 71.7,
+    "tenet_par": 38.5
+   }
+  },
+  "gemini-3.5-flash": {
+   "rag": 82.5,
+   "tenet_eff": 90.0,
+   "tenet_par": 90.0,
+   "acc1k": {
+    "rag": 38.3,
+    "tenet_eff": 75.9,
+    "tenet_par": 42.0
+   }
+  }
+ },
+ "multi_session_flip": {
+  "rag": [
+   50.0,
+   50.0,
+   62.5
+  ],
+  "tenet_par": [
+   87.5,
+   75.0,
+   87.5
+  ]
+ }
+}

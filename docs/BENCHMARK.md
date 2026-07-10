@@ -77,13 +77,26 @@ subagent harness (10 questions/agent, per-item isolation instructed), judge =
 | **Tenet** | efficiency (`--expand 0`) | **90.0** [76.9, 96.0] | **1,186** | **75.9** (2.0×) |
 | **Tenet** | parity (`--expand 20`) | **90.0** [76.9, 96.0] | 2,143 | 42.0 |
 
-At this reader tier Tenet is ahead of RAG at **both** operating points (CIs overlap at
-n=40 — read as ≥, not a CI-separated win), and the efficiency point doubles
-accuracy-per-token at half the context. Notably **multi-session — our documented weak
-spot — flips at this tier** (RAG 50%, Tenet 75/87.5): a stronger reader appears to
-compose Tenet's compact belief items across sessions better than it sifts RAG's raw-turn
-pool. Harness caveat: reader calls were batched 10-per-agent with isolation instructions
-rather than issued as fully independent API calls.
+**Reader-generality (measured 2026-07-11).** The same 120 captured tasks were then run
+through two more frontier readers via subscription CLIs — codex (`gpt-5.5`) and
+Gemini 3.5 Flash (High) — same qwen judge, 0 exclusions
+(`docs/lme_multireader_results.json`, per-reader answer JSONLs committed):
+
+| reader | RAG | Tenet eff (½ tokens) | Tenet parity |
+|---|---:|---:|---:|
+| claude-sonnet-5 | 82.5 | **90.0** | **90.0** |
+| gpt-5.5 | 77.5 | **85.0** | 82.5 |
+| gemini-3.5-flash | 82.5 | **90.0** | **90.0** |
+
+Per-cell CIs overlap at n=40 (each cell reads as ≥, not a CI-separated win); the
+evidence is the **6/6 directional replication across three independent reader
+families**, with accuracy-per-token ≈2× RAG at the efficiency point under every reader
+(71.7–75.9 vs 36.0–38.3). **Multi-session — our documented weak spot — flips under all
+three strong readers** (RAG 50–62.5%, Tenet 75–87.5%): a stronger reader composes
+Tenet's compact belief items across sessions better than it sifts RAG's raw-turn pool,
+making §8's weakness a reader-tier-dependent finding. Harness caveat (applies equally
+to all readers): reader calls were batched 10-per-CLI-invocation with per-item
+isolation instructions rather than fully independent API calls.
 
 ## 3. Long-horizon knowledge churn — where memory structurally wins (`scripts/bench_horizon.py`)
 A fact updated N times over a long history, retrieval budget k=6, 15 distractors,
