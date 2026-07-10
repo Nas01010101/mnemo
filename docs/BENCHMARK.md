@@ -3,6 +3,8 @@
 Tenet is evaluated on the standard **LongMemEval_S** benchmark (500 questions,
 ~115k-token multi-session histories) plus controlled capability tests. Every number is
 **honest and reproducible** from `scripts/`. Where a strong baseline beats us, we say so.
+[`METHODOLOGY.md`](METHODOLOGY.md) audits *how* each number is measured and exactly what
+claim it licenses (with an adversarial defect list + severities).
 
 > **Protocol.** A `gpt-4o` reader (the reader Mem0/Zep report against) + local embedder
 > (`bge-small-en-v1.5`) + cheap `gpt-4o-mini` distiller, via OpenRouter. This validates the **architecture** (Tenet vs baselines under identical
@@ -94,9 +96,16 @@ families**, with accuracy-per-token ≈2× RAG at the efficiency point under eve
 (71.7–75.9 vs 36.0–38.3). **Multi-session — our documented weak spot — flips under all
 three strong readers** (RAG 50–62.5%, Tenet 75–87.5%): a stronger reader composes
 Tenet's compact belief items across sessions better than it sifts RAG's raw-turn pool,
-making §8's weakness a reader-tier-dependent finding. Harness caveat (applies equally
-to all readers): reader calls were batched 10-per-CLI-invocation with per-item
-isolation instructions rather than fully independent API calls.
+making §8's weakness a reader-tier-dependent finding. **Harness caveat — the load-bearing
+weakness of this table (applies equally to all three readers): reader calls were batched
+10-per-CLI-invocation.** A single context window holding 10 items means a reader *can*
+attend to another item's retrieved context while answering; "per-item isolation
+instructions" is a soft prompt-level mitigation, **not** true isolation (contrast §12/§13,
+which issue one independent API call per item and are unaffected). This is the strongest-
+looking result in the document resting on the most contaminable measurement — so it is
+reported as a **directional** pattern (6/6 ≥, CIs overlap at n=40), and the cross-reader
+generality claim should be treated as *suggestive until re-run with one call per item*.
+See [`METHODOLOGY.md`](METHODOLOGY.md) Defect 8.
 
 ## 3. Long-horizon knowledge churn — where memory structurally wins (`scripts/bench_horizon.py`)
 A fact updated N times over a long history, retrieval budget k=6, 15 distractors,
@@ -309,7 +318,11 @@ ablation: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b` → EventQA 56.5, ruler 
   step: session-diverse retrieval (guarantee coverage across distinct evidence sessions).
 - **The frontier is a knob, not free lunch.** Parity accuracy costs RAG-equal tokens; the
   1.6× per-token win is at the efficiency point, which trades ~5pp of raw accuracy. One
-  system spans both, but no single setting wins every axis at once.
+  system spans both, but no single setting wins every axis at once. (Reader tokens are
+  estimated as `chars/4`, not a real tokenizer; measured against tiktoken this *over*-counts
+  Tenet's distilled context (4.15 chars/tok) and *under*-counts RAG's raw turns (3.82) — i.e.
+  the estimate is **conservative against our own per-token claim** (true ratio ≈47% of RAG's
+  tokens vs the 51% reported). See [`METHODOLOGY.md`](METHODOLOGY.md) Defect 6.)
 - QA numbers are off-Qwen (gpt-4o / gpt-4o-mini readers), n=40, one seed; reader noise
   ≈±5–7pp, so the one-shot result is reported as *parity*, not a win. Shipped system uses Qwen
   Cloud (config flip). Churn result is reader-robust (identical on gpt-4o).
@@ -679,6 +692,12 @@ mirrors §1's multi-session ingest: per conversation, distill each session into 
 > here is **qwen-judged and NOT directly comparable to vendor gpt-4o-mini-judged numbers**
 > (our absolute scores are also depressed by a strict short-answer reader prompt + k=10).
 > The **within-harness** arm comparison (tenet vs rag, identical reader + judge) IS valid.
+> The reader here is also qwen3.7-plus, so this is a **same-family self-judge** — but two
+> facts contain it: (1) both arms share the identical judge, so any leniency cancels in the
+> tenet-vs-rag delta; (2) measured judge-family sensitivity is small — 30 real (question,
+> gold, prediction) triples judged by qwen3.7-plus vs a cross-family Gemini-3.5-Flash judge
+> (identical prompt) agreed **30/30 = 100%** (`METHODOLOGY.md` Defect 4). The caveat bounds
+> *absolute* comparability to vendors, not the within-harness verdict.
 
 QA accuracy (qwen-judged; reader qwen3.7-plus, k=10; Wilson 95% CIs):
 
@@ -729,21 +748,31 @@ distractors). **Scoring is deterministic MC (pick the letter) — NO LLM judge, 
 judge-comparability caveat** (contrast §12). `scripts/bench_persona.py`, n=485 over 20
 personas (seed 0), reader qwen3.7-plus, k=20 retrieval, 0 API failures.
 
-**The load-bearing number is the BLIND control.** Before reading anything into the arm
-comparison, we ran a no-memory arm (reader sees only the profile line + question + 4 options,
-zero retrieved memory). If blind ≈ the memory arms, the MC would be answerable without memory
-and the comparison meaningless. It is not:
+**The validity check is the BLIND control.** Before reading anything into the arm
+comparison, we ran a no-*retrieval* arm (reader sees only the profile line + question + 4
+options, zero retrieved turns). If blind ≈ the memory arms, the MC would be answerable
+without retrieved memory and the comparison meaningless. It is not (note: blind is a
+profile-plus-plausibility floor, above the 25% random floor — it isolates the value of
+*retrieval*, which is the variable the arms differ on):
 
-| segment (n) | BLIND (no memory) | TENET (ours) | RAG (baseline) |
+| segment (n) | BLIND (no *retrieved* memory · profile only) | TENET (ours) | RAG (baseline) |
 |---|---|---|---|
 | OVERALL (485) | **34.4% [30.3, 38.8]** | 50.5% [46.1, 54.9] | 50.9% [46.5, 55.4] |
 | updated=True · retraction (124) | 35.5% [27.6, 44.2] | 67.7% [59.1, 75.3] | **74.2% [65.8, 81.1]** |
 | updated=False · plain recall (361) | 34.1% [29.4, 39.1] | 44.6% [39.6, 49.8] | 42.9% [37.9, 48.1] |
 
-(4-way MC, random = 25%.) **Memory is clearly load-bearing** — the retrieval arms beat blind
-by +16pp overall (non-overlapping CIs), and by +25-32pp on the hardest categories
-(anti-stereotypical, ask-to-forget). So the arm comparison is meaningful — and the honest
-result is a **dead tie: Tenet 50.5% ≈ RAG 50.9%** (paired McNemar p=0.92).
+(4-way MC, random = 25%.) The blind arm is a **no-*retrieval* floor** (static profile line +
+option-plausibility), **not** a pure-random 25% floor — so it measures what *retrieved*
+memory adds, not what any memory adds. On that axis it is decisive: **retrieved memory is
+load-bearing — the retrieval arms beat blind by +16pp overall (non-overlapping CIs)**, and
+by +25-32pp on the hardest categories (anti-stereotypical, ask-to-forget). So the arm
+comparison is meaningful. The Tenet-vs-RAG result is a **separate** claim resting on the
+paired test alone: **no statistically detectable difference — Tenet 50.5% vs RAG 50.9%,
+McNemar p=0.92.** This is an *underpowered null, not proven equivalence*: at n=485 (~100
+discordant pairs) the test has 80% power only for a ~6pp gap (its minimum detectable
+effect), so a true difference below ~6pp is not excluded. The blind control does **not**
+bear on this tie — it only establishes that memory matters, which makes the (indistinguishable)
+comparison worth reporting. See [`METHODOLOGY.md`](METHODOLOGY.md) Defects 1–2.
 
 **The supersession hypothesis is NOT supported.** On the retraction regime where Tenet was
 supposed to win, RAG is if anything ahead (74.2 vs 67.7, McNemar p=0.15, ns). Two measured
@@ -762,8 +791,9 @@ recast it as a **retrieval/compression** task (k=20 turns, ~1-2k tokens vs the f
 ask our tenet-vs-rag question. So our absolute numbers are **not comparable** to the paper's
 (frontier LLMs 37-48%, their agentic memory 55%, all full-context); only the within-harness
 blind/tenet/rag comparison at a fixed retrieval budget is valid. Not escalated beyond n=485:
-the tie is unambiguous (p=0.92) and more personas won't turn a supersession-mechanism that
-fires 3.8% of the time into a win.
+the *absence of a detectable difference* is clear (p=0.92 — but a statistical tie with
+MDE ≈ 6pp, not proven equivalence; see above), and more personas won't turn a
+supersession-mechanism that fires 3.8% of the time into a win.
 
 ## Reproduce
 
