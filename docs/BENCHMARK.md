@@ -831,6 +831,44 @@ text-floor — the text cosine cleanly separates real value-updates (≥0.72) fr
 shared-word coincidences (≤0.70) at zero true-fire cost; natural distinct attributes were
 never affected. Firing benchmark: `scripts/bench_supersession_firing.py`.
 
+## 14. Cross-system head-to-head (measured 2026-07-10)
+
+The definitive Tenet-vs-the-field comparison. Full tables + the published-vs-controlled
+columns + the ranked improvement follow-ups live in **[`docs/COMPARISON.md`](COMPARISON.md)**;
+this section is the summary + the reproduce commands. All arms are reproduced as arms of the
+SAME harness (same reader, embedder, SubEM/judge, seeds, Wilson CIs, failures-excluded), so
+method is the only variable — unlike vendor leaderboard numbers, which are not comparable
+(different backbone/judge/embedder) and are kept in a clearly-separated column in COMPARISON.
+
+**A. ChurnBench** (reader qwen3.7-plus, bge-small, n=30/pt, current Tenet with the 2026-07-10
+supersession-firing fix + §9.1 consistency):
+
+| U | Tenet | RAG | Mem0-style | HippoRAG-v2-style |
+|---|---:|---:|---:|---:|
+| 2 | **100.0** [88.6,100] | 96.7 | 90.0 | **100.0** |
+| 8 | **100.0** | **100.0** | **100.0** | **100.0** |
+| 32 | **100.0** [88.6,100] | 30.0 [16.7,47.9] | **100.0** [88.6,100] | 30.0 [16.7,47.9] |
+| half-life | **32** | 8 | **32** | 8 |
+
+This **reverses the §9 falsification** (pre-fix Tenet was 46% / half-life <2 here): current
+Tenet is tied-for-first with Mem0-style at 100% across all U and dominates RAG/HippoRAG at
+extreme churn — with **LLM-free reads** (Mem0-style pays an LLM ADD/UPDATE per fact at write).
+
+**B. MAB FactConsolidation** (matched 7B, n=200 pooled): Tenet **90.0 SH / 36.0 MH** leads all
+four methods incl. published-SOTA CAR (87.5 / 33.0) — see §6.1.
+**C. LoCoMo** (qwen-judged, n=500): RAG **38.8** > Tenet 33.8 (verbatim-recall regime we lose,
+p=0.031) — see §12. **D. PersonaMem-v2** (n=485): Tenet 53.4 ≈ RAG 50.9, both ≫ blind 34.4 —
+see §13.
+
+**Win/lose map:** Tenet WINS MAB-FC (SH+MH, beats CAR) and ChurnBench (tied-first, LLM-free);
+TIES PersonaMem + Mem0-on-churn; LOSES LoCoMo verbatim + multi-hop. Ranked, in-scope
+improvement follow-ups (CAR-as-reader, raw-favored recall, retraction op) are in COMPARISON.md.
+
+Reproduce (ChurnBench 4-arm, current Tenet): `CHURN_CACHE_DIR=<scratch> LLM_PROVIDER=qwen
+EMBED_PROVIDER=local python scripts/bench_churn.py --principals 6 --updates 2,8,32 --n-facts 5
+--distractor-sessions 4 --arms tenet,rag,mem0,hipporag --consistency-threshold 0.70
+--currency-context`. Same-harness method reproductions: `scripts/bench_baselines.py` (§6.1).
+
 ## Reproduce
 
 Every benchmark is wired into the CLI as `tenet bench` — one command per number, with
