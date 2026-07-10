@@ -101,6 +101,19 @@ _NEG_PAIRS = [
      ("The user's dog is called Biscuit.", "user::dog_name", "Biscuit")),
     ("city vs workplace_city", ("The user lives in Seattle.", "user::residence", "Seattle"),
      ("The user's office is in Bellevue.", "user::workplace_city", "Bellevue")),
+    # --- ADVERSARIAL: shared salient word inflates BOTH key-sim and text-sim ---
+    # (found by the scale/e2e agent as a false-supersession under tau=0.78/floor=0.35).
+    ("surface_probe vs temporal_probe",
+     ("The e2e probe fact is: X wrote this.", "user::surface_probe", "X wrote this"),
+     ("temporal probe v1", "user::temporal_probe", "temporal probe v1")),
+    ("work_location vs workout_location",
+     ("The user's work is located in Denver.", "user::work_location", "Denver"),
+     ("The user's workout happens at the downtown gym.", "user::workout_location", "downtown gym")),
+    ("pet vs pet_peeve", ("The user has a dog.", "user::pet", "dog"),
+     ("The user's pet peeve is loud chewing.", "user::pet_peeve", "loud chewing")),
+    ("coffee_shop vs coffee_preference",
+     ("The user goes to Blue Bottle coffee shop.", "user::coffee_shop", "Blue Bottle"),
+     ("The user prefers oat milk lattes.", "user::coffee_preference", "oat milk lattes")),
 ]
 
 
@@ -135,9 +148,10 @@ def norm(s: str) -> str:
     return s.lower().strip()
 
 
-def run_config(positives, negatives, resolution: bool, tau: float):
+def run_config(positives, negatives, resolution: bool, tau: float, text_floor: float):
     M._KEY_RESOLUTION = resolution
     M._TAU_KEY = tau
+    M._TEXT_FLOOR = text_floor
     core = MemoryCore(tempfile.mkdtemp() + "/f.db")
 
     # ---- positives: each has its own subject-namespace so chains don't cross-talk.
@@ -181,13 +195,13 @@ def run_config(positives, negatives, resolution: bool, tau: float):
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--taus", default="0.75,0.82,0.88,0.92")
-    ap.add_argument("--text-floor", type=float, default=0.35)
+    ap.add_argument("--text-floors", default="0.35", help="comma list of _TEXT_FLOOR values to sweep")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--cache", default="")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
-    M._TEXT_FLOOR = args.text_floor
     taus = [float(x) for x in args.taus.split(",")]
+    floors = [float(x) for x in args.text_floors.split(",")]
 
     positives, negatives = build_items(args.seed)
     cache_path = Path(args.cache or (tempfile.mkdtemp() + "/distill.json"))
@@ -204,40 +218,46 @@ def main() -> int:
     for _label, a, b in negatives:
         pass  # negatives use hand-written statements/keys directly (no distill needed)
     print(f"labeled set: {len(positives)} positive chains ({n_msgs} update msgs), "
-          f"{len(negatives)} negative pairs. text_floor={args.text_floor}\n", flush=True)
+          f"{len(negatives)} negative pairs (incl. adversarial shared-word).\n", flush=True)
 
-    configs = [("OFF (exact-key only)", False, 0.0)] + [(f"ON tau={t}", True, t) for t in taus]
+    # OFF baseline (exact-key only) + ON grid over (tau × text_floor).
+    configs = [("OFF exact-key", False, 0.0, 0.0)]
+    for fl in floors:
+        for t in taus:
+            configs.append((f"ON tau={t} floor={fl}", True, t, fl))
     results = []
-    print(f"{'config':>22} | {'true-fire':>22} | {'false-fire':>20} | {'end-state':>16}")
-    for name, res, tau in configs:
-        r = run_config(positives, negatives, res, tau)
+    print(f"{'config':>26} | {'true-fire':>22} | {'false-fire':>20} | {'end-state':>14}")
+    for name, res, tau, fl in configs:
+        r = run_config(positives, negatives, res, tau, fl)
         tf = r["resolved"] / r["scorable"] if r["scorable"] else 0.0
         ff = r["false_fire"] / r["n_neg"] if r["n_neg"] else 0.0
         es = r["end_ok"] / r["n_pos"] if r["n_pos"] else 0.0
         tlo, thi = wilson_ci(tf, r["scorable"])
         flo, fhi = wilson_ci(ff, r["n_neg"])
-        results.append({"config": name, "tau": tau, "true_fire": tf, "false_fire": ff,
-                        "end_state": es, **r})
-        print(f"{name:>22} | {100*tf:5.1f}% [{100*tlo:4.1f},{100*thi:5.1f}] {r['resolved']:>2}/{r['scorable']:<2} "
+        results.append({"config": name, "tau": tau, "text_floor": fl, "true_fire": tf,
+                        "false_fire": ff, "end_state": es, **r})
+        print(f"{name:>26} | {100*tf:5.1f}% [{100*tlo:4.1f},{100*thi:5.1f}] {r['resolved']:>2}/{r['scorable']:<2} "
               f"| {100*ff:5.1f}% [{100*flo:4.1f},{100*fhi:5.1f}] {r['false_fire']}/{r['n_neg']} "
               f"| {100*es:5.1f}% {r['end_ok']}/{r['n_pos']}")
 
-    # pick: max true-fire with false-fire <= 2% (fallback: minimize false-fire then max true-fire)
-    ok = [r for r in results if r["config"].startswith("ON") and r["false_fire"] <= 0.02]
-    pick = (max(ok, key=lambda r: r["true_fire"]) if ok
-            else max((r for r in results if r["config"].startswith("ON")),
-                     key=lambda r: (r["true_fire"], -r["false_fire"])))
+    # pick: STRICT false-fire == 0 on the expanded (adversarial) negatives, max true-fire.
+    on = [r for r in results if r["config"].startswith("ON")]
+    clean = [r for r in on if r["false_fire"] == 0.0]
+    pick = (max(clean, key=lambda r: r["true_fire"]) if clean
+            else max(on, key=lambda r: (-r["false_fire"], r["true_fire"])))
     base = next(r for r in results if not r["config"].startswith("ON"))
     print(f"\nbaseline (exact-key) true-fire: {100*base['true_fire']:.1f}%")
     print(f"RECOMMEND: {pick['config']}  true-fire={100*pick['true_fire']:.1f}%  "
-          f"false-fire={100*pick['false_fire']:.1f}%  (gate: true-fire>=60% at false-fire<=2%)")
-    gate = pick["true_fire"] >= 0.60 and pick["false_fire"] <= 0.02
-    print(f"FIRING GATE: {'PASS' if gate else 'NOT MET'}")
+          f"false-fire={100*pick['false_fire']:.1f}%")
+    gate = pick["true_fire"] >= 0.75 and pick["false_fire"] == 0.0
+    print(f"HARDENED FIRING GATE (true-fire>=75% at false-fire=0% incl. adversarial): "
+          f"{'PASS' if gate else 'NOT MET'}")
 
     if args.out:
         Path(args.out).write_text(json.dumps(
             {"results": results, "recommend": pick["config"], "recommend_tau": pick["tau"],
-             "baseline_true_fire": base["true_fire"], "gate_pass": gate}, indent=2, default=str))
+             "recommend_text_floor": pick["text_floor"], "baseline_true_fire": base["true_fire"],
+             "gate_pass": gate}, indent=2, default=str))
         print(f"wrote {args.out}")
     return 0
 

@@ -31,7 +31,9 @@ def main() -> int:
     assert not _value_compatible("user::milk", "bob::milk"), "different subjects never compatible"
 
     # --- ON: synonym-drift keys collapse (the core fix) ------------------
-    M._KEY_RESOLUTION, M._TAU_KEY, M._TEXT_FLOOR = True, 0.78, 0.35
+    # Use the SHIPPED defaults (tau=0.78, text_floor=0.66) so the test guards the
+    # actual default-on behaviour, including the hardened floor.
+    M._KEY_RESOLUTION, M._TAU_KEY, M._TEXT_FLOOR = True, 0.78, 0.66
     c = _fresh()
     c.store("The user drinks oat milk.", key="user::milk")
     c.store("The user has switched to almond milk.", key="user::milk_preference")
@@ -63,6 +65,27 @@ def main() -> int:
     if c.stats()["superseded"] != 0:
         fails.append("guard: unrelated attributes (job vs milk) collapsed")
     c.close()
+
+    # --- guard: ADVERSARIAL shared-salient-word pairs must NOT collapse ---
+    # (a shared word like "probe"/"location"/"pet"/"coffee" inflates BOTH the key
+    # embedding and the text embedding; the fact-text floor at 0.66 is what stops these.)
+    adversarial = [
+        (("The e2e probe fact is: X wrote this.", "user::surface_probe"),
+         ("temporal probe v1", "user::temporal_probe")),
+        (("The user's work is located in Denver.", "user::work_location"),
+         ("The user's workout happens at the downtown gym.", "user::workout_location")),
+        (("The user has a dog.", "user::pet"),
+         ("The user's pet peeve is loud chewing.", "user::pet_peeve")),
+        (("The user goes to Blue Bottle coffee shop.", "user::coffee_shop"),
+         ("The user prefers oat milk lattes.", "user::coffee_preference")),
+    ]
+    for (t1, k1), (t2, k2) in adversarial:
+        c = _fresh()
+        c.store(t1, key=k1, pinned=True)
+        c.store(t2, key=k2)
+        if c.stats()["superseded"] != 0:
+            fails.append(f"adversarial: {k1} wrongly superseded by {k2} (shared-word false-fire)")
+        c.close()
 
     # --- OFF: exact-key only, variant keys do NOT collapse ---------------
     M._KEY_RESOLUTION = False

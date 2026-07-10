@@ -85,8 +85,14 @@ def _env_off(name: str, default_on: bool) -> bool:
 # scripts/bench_supersession_firing.py + scratchpad/supersession_fix.md).
 # Force off with TENET_KEY_RESOLUTION=off.
 _KEY_RESOLUTION = _env_off("TENET_KEY_RESOLUTION", default_on=True)
-_TAU_KEY = float(os.environ.get("TENET_KEY_RESOLUTION_TAU", "0.78"))  # swept: 80% true-fire / 0% false-fire
-_TEXT_FLOOR = float(os.environ.get("TENET_KEY_RESOLUTION_TEXTFLOOR", "0.35"))
+_TAU_KEY = float(os.environ.get("TENET_KEY_RESOLUTION_TAU", "0.78"))  # swept: 80% true-fire
+# _TEXT_FLOOR raised 0.35->0.66 (2026-07-10) after a shared-salient-word false-supersession
+# ("user::surface_probe" vs "user::temporal_probe": both key AND text share "probe", clearing
+# tau but NOT a 0.66 fact-text floor). Swept on the labeled set incl. 4 adversarial shared-word
+# negatives: 0.66 gives 80% true-fire at 0% false-fire (robust across the 0.62-0.72 band; true-fire
+# is unchanged from the old 0.35, so the floor costs nothing). The fact-text cosine is the clean
+# separator — shared-word-but-different-fact pairs sit at <=0.70, real value-updates at >=0.72.
+_TEXT_FLOOR = float(os.environ.get("TENET_KEY_RESOLUTION_TEXTFLOOR", "0.66"))
 # Sub-attribute qualifiers: a key whose attribute is <another attribute> + one of
 # these names a DIFFERENT property of the same object (pet vs pet_name, car vs
 # car_color) — an update to one must never supersede the other. Meta qualifiers
