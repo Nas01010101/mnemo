@@ -146,8 +146,8 @@ the fair comparison.
   (reader-bound, not retrieval-bound); the vendor LongMemEval leaderboard on *absolute*
   accuracy (bge-small harness, not the memory design — our own RAG only reaches ~57% there).
 
-### Improvement follow-ups — two implemented and measured (both kept OFF), two open
-The top two EV follow-ups were built (behind default-off flags) and measured; both are
+### Improvement follow-ups — three implemented and measured (all kept OFF), one open
+The top three EV follow-ups were built (behind default-off flags) and measured; all are
 **honest negatives**, and the negatives are themselves informative:
 
 1. **CAR-style read-time `max(serial)` aggregation** (`src/tenet/aggregate.py`,
@@ -164,9 +164,26 @@ The top two EV follow-ups were built (behind default-off flags) and measured; bo
    assume a prior value. A semantically-correct "delete with no replacement" is not what
    this benchmark rewards. Deterministically correct (7 tests), kept OFF, flagged.
 
-Still open (not yet built): **raw-turn-favored recall mode** for the LoCoMo verbatim gap
-(higher `expand`, raw-priority), and **hard-delete for extreme-churn keys** (low priority —
-we already tie Mem0-style and it risks the `as_of` history win).
+3. **Raw-turn-favored recall mode** (`MemoryCore.recall(raw_recall=True)`, `TENET_RAW_RECALL`,
+   default OFF) — **measured regression** on LoCoMo, the one verbatim regime we lose. ON gives
+   the raw source-turn pool priority up to the full top-`k` budget (facts backfill the
+   remainder) instead of the default `k//2` cap. Result at n=100 (qwen reader, seed 0, only
+   the flag differs): overall 28.0 → 24.0, temporal 9.5 → **0.0** (collapsed), single-hop
+   40.0 → 38.2, multi-hop 16.7 → 11.1; paired McNemar OFF wins the discordant pairs 7–3
+   (p=0.34, not significant alone but every category points the same way). Per the stop-gate,
+   not escalated to n=500. *Why:* with a fixed `k`, forcing the shared pool raw-heavy
+   **displaces** the distiller's session/date-carrying facts rather than adding capacity —
+   sampled temporal misses under ON all returned "No information available." RAG's edge on
+   LoCoMo is not "more raw text" but an **unshared** pool that is *entirely* raw with the full
+   budget to itself; Tenet's shared belief+raw pool cannot replicate that structure by
+   re-weighting without giving up the evidence that was pulling weight. Deterministically
+   correct (5 tests), byte-identical default-OFF path, kept OFF, flagged.
+
+Still open (not yet built): **hard-delete for extreme-churn keys** (low priority — we already
+tie Mem0-style and it risks the `as_of` history win). The verbatim-recall gap is now
+characterized as a **structural** RAG advantage (unshared full-budget raw pool), not a
+tunable one — closing it would require a separate raw-only retrieval path, which trades away
+the belief-state design that wins FactConsolidation.
 
 ## What Tenet does NOT claim
 - Not SOTA on raw LongMemEval accuracy — agentmemory (96.2%), Mastra (94.9%), Mem0 (94.4%)
