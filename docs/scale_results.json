@@ -1,0 +1,120 @@
+{
+  "d": 384,
+  "reps": 15,
+  "sizes": [
+    1000,
+    10000,
+    100000
+  ],
+  "scale_sweep": [
+    {
+      "n": 1000,
+      "ingest_measured_facts": 500,
+      "ingest_measured_seconds": 0.031,
+      "ingest_facts_per_sec": 16352.6,
+      "recall": {
+        "e2e_ms_p50": 8.967,
+        "e2e_ms_p95": 10.843,
+        "fetch_deserialize_ms_p50": 0.898,
+        "matmul_ms_p50": 0.006
+      },
+      "cold_vs_warm": {
+        "first_call_ms": 11.19,
+        "subsequent_calls_ms_mean": 8.96,
+        "speedup_ratio": 1.25,
+        "verdict": "NO warm-cache speedup \u2014 every call re-fetches+re-deserializes the full matrix from sqlite (confirms: cold every query)"
+      },
+      "db_disk_mb": 1.84,
+      "resident_matrix_mb_if_cached": 1.46,
+      "rss_mb": 589.9
+    },
+    {
+      "n": 10000,
+      "ingest_measured_facts": 500,
+      "ingest_measured_seconds": 0.028,
+      "ingest_facts_per_sec": 17695.3,
+      "recall": {
+        "e2e_ms_p50": 10.077,
+        "e2e_ms_p95": 15.268,
+        "fetch_deserialize_ms_p50": 1.35,
+        "matmul_ms_p50": 0.011
+      },
+      "cold_vs_warm": {
+        "first_call_ms": 12.464,
+        "subsequent_calls_ms_mean": 10.393,
+        "speedup_ratio": 1.2,
+        "verdict": "NO warm-cache speedup \u2014 every call re-fetches+re-deserializes the full matrix from sqlite (confirms: cold every query)"
+      },
+      "db_disk_mb": 19.82,
+      "resident_matrix_mb_if_cached": 14.65,
+      "rss_mb": 667.7
+    },
+    {
+      "n": 100000,
+      "ingest_measured_facts": 500,
+      "ingest_measured_seconds": 0.067,
+      "ingest_facts_per_sec": 7441.1,
+      "recall": {
+        "e2e_ms_p50": 10.826,
+        "e2e_ms_p95": 13.674,
+        "fetch_deserialize_ms_p50": 1.843,
+        "matmul_ms_p50": 0.022
+      },
+      "cold_vs_warm": {
+        "first_call_ms": 13.958,
+        "subsequent_calls_ms_mean": 12.201,
+        "speedup_ratio": 1.14,
+        "verdict": "NO warm-cache speedup \u2014 every call re-fetches+re-deserializes the full matrix from sqlite (confirms: cold every query)"
+      },
+      "db_disk_mb": 198.56,
+      "resident_matrix_mb_if_cached": 146.48,
+      "rss_mb": 1394.7
+    }
+  ],
+  "unkeyed_probe": [
+    {
+      "pre_existing_n": 0,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.009,
+      "facts_per_sec": 23357.8
+    },
+    {
+      "pre_existing_n": 2000,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.01,
+      "facts_per_sec": 20065.9
+    },
+    {
+      "pre_existing_n": 4000,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.011,
+      "facts_per_sec": 17881.2
+    },
+    {
+      "pre_existing_n": 6000,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.011,
+      "facts_per_sec": 18446.5
+    },
+    {
+      "pre_existing_n": 8000,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.011,
+      "facts_per_sec": 17421.0
+    },
+    {
+      "pre_existing_n": 10000,
+      "unkeyed_batch": 200,
+      "elapsed_s": 0.011,
+      "facts_per_sec": 17542.6
+    }
+  ],
+  "extrapolation_to_1M": {
+    "recall_ms_per_fact_slope": 1.5e-05,
+    "recall_ms_intercept": 9.419,
+    "predicted_e2e_recall_ms_at_1M": 24.0,
+    "method": "linear fit on measured n vs e2e_ms_p50 (recall is documented O(n*d))",
+    "predicted_db_disk_mb_at_1M": 1986.5,
+    "predicted_rss_mb_at_1M": 8692.5
+  }
+}

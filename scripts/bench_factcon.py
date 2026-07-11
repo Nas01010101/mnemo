@@ -276,6 +276,9 @@ def main():
     ap.add_argument("--nav-max-hops", type=int, default=4, help="navigate() hard depth budget")
     ap.add_argument("--nav-tau", type=float, default=0.15,
                     help="navigate() marginal-gain floor (tau_gain) to adopt a deeper hop")
+    ap.add_argument("--tenet-agg", action="store_true",
+                    help="opt into recall()'s CAR-style read-time recency aggregation "
+                         "(docs/COMPARISON.md follow-up #1) on the tenet arm; default off")
     args = ap.parse_args()
     global KEY_MODE
     KEY_MODE = args.keys
@@ -322,7 +325,8 @@ def main():
                 tp, tenet_pool = answer_multihop(m, q, args.k)
             else:
                 hops = args.hops_mh if is_mh else 0
-                hits = m.core.recall(q, k=args.k, expand=args.k if hops else 0, hops=hops)
+                hits = m.core.recall(q, k=args.k, expand=args.k if hops else 0, hops=hops,
+                                      agg_reader=args.tenet_agg)
                 tenet_pool = "\n".join(f"{h.source}. {h.text}" for h in hits)
                 tp = (answer_extract(tenet_pool, q) if args.tenet_read != "official"
                       else answer(tenet_pool, q))

@@ -79,33 +79,35 @@ subagent harness (10 questions/agent, per-item isolation instructed), judge =
 | **Tenet** | efficiency (`--expand 0`) | **90.0** [76.9, 96.0] | **1,186** | **75.9** (2.0×) |
 | **Tenet** | parity (`--expand 20`) | **90.0** [76.9, 96.0] | 2,143 | 42.0 |
 
-**Reader-generality (measured 2026-07-11).** The same 120 captured tasks were then run
-through two more frontier readers via subscription CLIs — codex (`gpt-5.5`) and
-Gemini 3.5 Flash (High) — same qwen judge, 0 exclusions
-(`docs/lme_multireader_results.json`, per-reader answer JSONLs committed):
+**Reader-generality — batched then re-verified un-batched (2026-07-11).** The 120
+captured tasks were run through two more frontier readers via subscription CLIs
+(codex `gpt-5.5`, Gemini 3.5 Flash High), same qwen judge, 0 exclusions. The first pass
+batched 10 items per CLI call; a methodology audit (METHODOLOGY.md, Defect 8) flagged
+that as contaminable, so we **re-ran both readers one call per item** and re-judged. The
+un-batched numbers are the ones of record:
 
-| reader | RAG | Tenet eff (½ tokens) | Tenet parity |
-|---|---:|---:|---:|
-| claude-sonnet-5 | 82.5 | **90.0** | **90.0** |
-| gpt-5.5 | 77.5 | **85.0** | 82.5 |
-| gemini-3.5-flash | 82.5 | **90.0** | **90.0** |
+| reader | harness | RAG | Tenet eff (½ tokens) | Tenet parity |
+|---|---|---:|---:|---:|
+| gpt-5.5 | un-batched | 75.0 | **77.5** | **77.5** |
+| gemini-3.5-flash | un-batched | 70.0 | **75.0** | 70.0–72.5 |
+| gpt-5.5 | batched (superseded) | 77.5 | 85.0 | 82.5 |
+| gemini-3.5-flash | batched (superseded) | 82.5 | 90.0 | 90.0 |
+| claude-sonnet-5 | batched only¹ | 82.5 | 90.0 | 90.0 |
 
-Per-cell CIs overlap at n=40 (each cell reads as ≥, not a CI-separated win); the
-evidence is the **6/6 directional replication across three independent reader
-families**, with accuracy-per-token ≈2× RAG at the efficiency point under every reader
-(71.7–75.9 vs 36.0–38.3). **Multi-session — our documented weak spot — flips under all
-three strong readers** (RAG 50–62.5%, Tenet 75–87.5%): a stronger reader composes
-Tenet's compact belief items across sessions better than it sifts RAG's raw-turn pool,
-making §8's weakness a reader-tier-dependent finding. **Harness caveat — the load-bearing
-weakness of this table (applies equally to all three readers): reader calls were batched
-10-per-CLI-invocation.** A single context window holding 10 items means a reader *can*
-attend to another item's retrieved context while answering; "per-item isolation
-instructions" is a soft prompt-level mitigation, **not** true isolation (contrast §12/§13,
-which issue one independent API call per item and are unaffected). This is the strongest-
-looking result in the document resting on the most contaminable measurement — so it is
-reported as a **directional** pattern (6/6 ≥, CIs overlap at n=40), and the cross-reader
-generality claim should be treated as *suggestive until re-run with one call per item*.
-See [`METHODOLOGY.md`](METHODOLOGY.md) Defect 8.
+**What the un-batched re-run changed and what it did not.** Batching inflated absolute
+accuracy by ~2–17pp (larger for Gemini), confirming the audit's contamination concern —
+so the batched matrix is retained only as a struck-through record. **The load-bearing
+claims survive the clean measurement:** on both un-batched readers Tenet ≥ RAG at both
+operating points, and the efficiency point delivers **≈1.9× accuracy-per-token at half
+the context** (gpt-5.5 65.3 vs 34.8; gemini 63.2 vs 32.5 acc/1k). The **multi-session
+weakness still flips un-batched** (RAG 50.0 vs Tenet 62.5 on both readers). Per-cell CIs
+overlap at n=40 — the evidence is the directional replication (Tenet ≥ RAG, per-token
+win, multi-session flip) across two independent, properly-isolated reader families.
+¹ Sonnet-5 ran via the batched subagent harness only (the un-batched re-run used the two
+scriptable CLIs); its row is batched-inflated like the others and kept for completeness,
+not treated as load-bearing. Artifacts: `docs/lme_multireader_results.json`,
+`docs/lme_unbatched_*.jsonl`. See [`METHODOLOGY.md`](METHODOLOGY.md) Defect 8 (now
+resolved by re-measurement).
 
 ## 3. Long-horizon knowledge churn — where memory structurally wins (`scripts/bench_horizon.py`)
 A fact updated N times over a long history, retrieval budget k=6, 15 distractors,
@@ -369,6 +371,12 @@ questions/point (10 principals × 5 facts), Wilson 95% CIs, 0 API-error exclusio
 | 32 | 46.0 [33.0, 59.6] | 30.0 [19.1, 43.8] | **100.0** [92.9,100.0] | 30.0 [19.1, 43.8] |
 
 churn half-life: **tenet <2, rag 8, mem0 32, hipporag 8**.
+
+> **Outcome (read forward):** this falsification was diagnosed (below), fixed by a
+> read-time consistency rule (§9.1, → 98/92/82), and then **fully closed** by the
+> write-side embedding key-resolution (§13.1) — a fresh four-arm run scores Tenet
+> **100/100/100** at U=2/8/32, half-life 32, tied-for-first with Mem0-style and LLM-free
+> (§14). The section below is the original falsification, kept as the pre-registered record.
 
 **Ship gate: FALSIFIED, not a partial miss.** The pre-registered gate (Tenet half-life
 ≥2× best baseline, CI-separated at U=8) required Tenet to *lead*; instead Tenet is the
@@ -794,6 +802,78 @@ blind/tenet/rag comparison at a fixed retrieval budget is valid. Not escalated b
 the *absence of a detectable difference* is clear (p=0.92 — but a statistical tie with
 MDE ≈ 6pp, not proven equivalence; see above), and more personas won't turn a
 supersession-mechanism that fires 3.8% of the time into a win.
+
+### §13.1 Fixing the under-firing (measured 2026-07-11, `TENET_KEY_RESOLUTION`, default ON)
+
+The 3.8% firing rate was the actionable defect: "I've switched to almond milk" distils
+to a key that does not string-match the prior belief, so no collision fires. The fix is
+LLM-free and two-part: (1) the distiller is forbidden from vague umbrella keys
+(`preference`/`activity`/…), forcing the concrete attribute noun; (2) at store time a new
+fact also supersedes a **same-subject** current fact whose attribute-key embedding is
+cosine ≥ 0.78 **and** value-compatible (guards block sub-attribute refinements like
+`pet`/`pet_name` and cross-user collapse). Measured on a labeled set (15 positive update
+chains, 12 negatives):
+
+Measured on an expanded labeled set (15 positive update chains, 16 negatives **including
+4 adversarial shared-salient-word pairs**), sweeping the fact-text similarity floor:
+
+| config | true-fire | false-fire |
+|---|---:|---:|
+| old distiller (baseline) | 40.0% | 0% |
+| new distiller, exact-key only | 66.7% | 0% |
+| embedding key-resolution, τ=0.78, floor=0.35 | 80.0% | 6.2% (adversarial fires) |
+| **+ hardened floor=0.66 (default)** | **80.0%** | **0.0% (0/16)** |
+
+Real firing on PersonaMem rose **3.8% → ~6–8%**; PersonaMem overall **50.5 → 53.4%**
+(+2.9pp over the fix-OFF baseline; retraction subset 67.7 → 71.0). **Gates all pass**
+(MAB FC-SH smoke 95.0, churn U=8 100%, 9/9 deterministic suites green including 4
+adversarial-negative assertions, false-fire 0%), so it ships **default-on, hardened**.
+**Honest bounds:** (a) the `ask_to_forget` retraction subset is a *deletion*
+("forget X"), not a value replacement (X→Y), so key-resolution only partly targets it;
+a tombstone mechanism is the separate next step. (b) The false-supersession that a shared
+salient word could trigger (distinct attributes whose key names *and* text both contain
+the same word, e.g. `surface_probe` vs `temporal_probe`) is eliminated by the raised
+text-floor — the text cosine cleanly separates real value-updates (≥0.72) from
+shared-word coincidences (≤0.70) at zero true-fire cost; natural distinct attributes were
+never affected. Firing benchmark: `scripts/bench_supersession_firing.py`.
+
+## 14. Cross-system head-to-head (measured 2026-07-10)
+
+The definitive Tenet-vs-the-field comparison. Full tables + the published-vs-controlled
+columns + the ranked improvement follow-ups live in **[`docs/COMPARISON.md`](COMPARISON.md)**;
+this section is the summary + the reproduce commands. All arms are reproduced as arms of the
+SAME harness (same reader, embedder, SubEM/judge, seeds, Wilson CIs, failures-excluded), so
+method is the only variable — unlike vendor leaderboard numbers, which are not comparable
+(different backbone/judge/embedder) and are kept in a clearly-separated column in COMPARISON.
+
+**A. ChurnBench** (reader qwen3.7-plus, bge-small, n=30/pt, current Tenet with the 2026-07-10
+supersession-firing fix + §9.1 consistency):
+
+| U | Tenet | RAG | Mem0-style | HippoRAG-v2-style |
+|---|---:|---:|---:|---:|
+| 2 | **100.0** [88.6,100] | 96.7 | 90.0 | **100.0** |
+| 8 | **100.0** | **100.0** | **100.0** | **100.0** |
+| 32 | **100.0** [88.6,100] | 30.0 [16.7,47.9] | **100.0** [88.6,100] | 30.0 [16.7,47.9] |
+| half-life | **32** | 8 | **32** | 8 |
+
+This **reverses the §9 falsification** (pre-fix Tenet was 46% / half-life <2 here): current
+Tenet is tied-for-first with Mem0-style at 100% across all U and dominates RAG/HippoRAG at
+extreme churn — with **LLM-free reads** (Mem0-style pays an LLM ADD/UPDATE per fact at write).
+
+**B. MAB FactConsolidation** (matched 7B, n=200 pooled): Tenet **90.0 SH / 36.0 MH** leads all
+four methods incl. published-SOTA CAR (87.5 / 33.0) — see §6.1.
+**C. LoCoMo** (qwen-judged, n=500): RAG **38.8** > Tenet 33.8 (verbatim-recall regime we lose,
+p=0.031) — see §12. **D. PersonaMem-v2** (n=485): Tenet 53.4 ≈ RAG 50.9, both ≫ blind 34.4 —
+see §13.
+
+**Win/lose map:** Tenet WINS MAB-FC (SH+MH, beats CAR) and ChurnBench (tied-first, LLM-free);
+TIES PersonaMem + Mem0-on-churn; LOSES LoCoMo verbatim + multi-hop. Ranked, in-scope
+improvement follow-ups (CAR-as-reader, raw-favored recall, retraction op) are in COMPARISON.md.
+
+Reproduce (ChurnBench 4-arm, current Tenet): `CHURN_CACHE_DIR=<scratch> LLM_PROVIDER=qwen
+EMBED_PROVIDER=local python scripts/bench_churn.py --principals 6 --updates 2,8,32 --n-facts 5
+--distractor-sessions 4 --arms tenet,rag,mem0,hipporag --consistency-threshold 0.70
+--currency-context`. Same-harness method reproductions: `scripts/bench_baselines.py` (§6.1).
 
 ## Reproduce
 

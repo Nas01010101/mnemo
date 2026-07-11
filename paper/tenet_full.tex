@@ -42,9 +42,10 @@ already predict; and (v) \textbf{belief-anchored evidence expansion} spends spar
 on raw turns from the sessions the belief state already surfaced. The read path never
 calls an LLM. \tenet{} holds $100\%$ on this templated single-attribute churn primitive at
 every update level (\S\ref{sec:churn}); on the harsher \emph{paraphrased} multi-attribute
-ChurnBench (\S\ref{sec:churnbench}) a read-time consistency rule---defaulted on---lifts it
-from worst-arm to $98/92/82$ at $U{=}2/8/32$, though write-time delete-outright consolidation
-still leads at extreme churn. On
+ChurnBench (\S\ref{sec:churnbench}) it was initially \emph{falsified} (worst arm); a
+read-time consistency rule plus write-side embedding key-resolution---both defaulted
+on---recover it to $100/100/100$ at $U{=}2/8/32$ (half-life $32$), tying delete-outright
+Mem0-style for first while keeping LLM-free reads. On
 MemoryAgentBench \textsc{FactConsolidation} (ICLR~2026) it scores $86.5\%$ single-hop
 \ci{82.8}{89.5}---above the published \texttt{gpt-4o-mini}-tier state of the art
 ($78.0$) despite using a local 7B backbone---and ties the multi-hop state of the art
@@ -424,18 +425,18 @@ RAG is multi-session synthesis (42.9 vs 57.1, up from 28.6; \S\ref{sec:limits}).
 
 \paragraph{Reader-generality at the frontier tier.} We subsequently ran the identical
 captured task set (fresh $n{=}40$ sample, seed 0, Qwen distiller) through three 2026
-frontier readers from independent families---\texttt{claude-sonnet-5},
-\texttt{gpt-5.5}, and \texttt{gemini-3.5-flash}---under one cross-family judge
-(\texttt{qwen3.7-plus}), zero exclusions. \tenet{} leads naive RAG in \textbf{6/6}
-(reader $\times$ operating point) comparisons: $90.0/90.0$ vs $82.5$ (Sonnet),
-$85.0/82.5$ vs $77.5$ (GPT-5.5), $90.0/90.0$ vs $82.5$ (Gemini), with
-accuracy-per-token $\approx 2\times$ RAG at the efficiency point under every reader.
-Per-cell Wilson CIs overlap at this $n$; the evidence is the directional replication
-across families. Notably, the multi-session weakness \emph{inverts} under all three
-frontier readers (RAG 50--62.5 vs \tenet{} 75--87.5): a sufficiently strong reader
-composes \tenet{}'s compact belief items across sessions better than it sifts a
-raw-turn pool. Artifacts: \texttt{docs/lme\_multireader\_results.json} and per-reader
-answer logs in the repository.
+frontier readers from independent families under one cross-family judge
+(\texttt{qwen3.7-plus}). An initial pass batched 10 questions per CLI call; a methodology
+audit flagged this as contaminable, so we \textbf{re-ran two scriptable readers one call
+per item} (\texttt{gpt-5.5}, \texttt{gemini-3.5-flash}) and re-judged---these un-batched
+numbers are of record. Batching had inflated absolute accuracy by $\sim$2--17\,pp; the
+\emph{directional} claims survive the clean measurement: \tenet{} $\ge$ RAG at both
+operating points on both readers ($77.5/77.5$ vs $75.0$ GPT-5.5; $75.0/72.5$ vs $70.0$
+Gemini), the efficiency point delivers $\approx 1.9\times$ accuracy-per-token at half the
+context, and the multi-session weakness still \emph{inverts} un-batched (RAG $50.0$ vs
+\tenet{} $62.5$ on both). Per-cell Wilson CIs overlap at $n{=}40$; the evidence is the
+directional replication across two independently-isolated reader families.
+Artifacts: \texttt{docs/lme\_unbatched\_*.jsonl}.
 
 \subsection{Ablations}\label{sec:ablation}
 On the controlled knowledge-update set, removing the belief--evidence consistency rule
@@ -664,6 +665,20 @@ All regression gates pass with the fix defaulted on (7 deterministic suites;
 invariant---that arm never stores raw slices), so \texttt{recall()}'s
 \texttt{consistency\_threshold} now defaults to $0.70$ in shipped code.
 
+\paragraph{Full recovery via write-side key resolution.} The read-time fix attacks stale
+raw evidence \emph{after} it is stored; a complementary write-side fix removes it at the
+source. The embedding key-resolution of \S\ref{sec:limits} (a conversational update
+supersedes a same-subject belief whose attribute-key embeds within $0.78$ and whose text
+clears the $0.66$ floor) makes paraphrased updates actually collide at ingestion, so far
+fewer stale versions ever enter the raw pool. With both fixes on (the shipped default), a
+fresh four-arm run recovers \textsc{ChurnBench} to $100/100/100$ at $U{\in}\{2,8,32\}$
+(half-life $32$, $n{=}30$, Wilson CIs in \texttt{docs/BENCHMARK.md}~\S14): \tenet{} now
+\textbf{ties delete-outright Mem0-style for first} and dominates the retrieval baselines
+(RAG/HippoRAG-v2-style collapse to $30$ at $U{=}32$)---while keeping \textbf{LLM-free
+reads}, where Mem0-style pays an LLM add/update per write. The pre-registered falsification
+is thus fully closed, and by a mechanism the belief-state design predicts rather than a
+benchmark-specific patch.
+
 \subsection{Closing the write-path dependency: a local distiller}\label{sec:localdistill}
 Every result above distills with Qwen Cloud (\texttt{qwen3.7-plus}); the write path---turning
 a message into keyed JSON facts---is \tenet{}'s only remaining LLM dependency (reads are
@@ -736,6 +751,19 @@ graphs at ingestion. At equal accuracy this asymmetry compounds over an agent's 
 ingestion happens once per fact, reads happen forever, and \tenet{} prices both at
 embedding cost.
 
+\textbf{Ingestion-time consistency makes read-time conflict resolution redundant.} We
+tested this directly: adding CAR-style read-time \texttt{max(serial)} aggregation
+(\cite{freshness}'s trick, the current FactConsolidation SOTA mechanism) as an optional
+reader over \tenet{}'s pool changed nothing---FC multi-hop $15.0\to15.0$, LoCoMo
+$29.0\to28.0$ ($n{=}20/100$). Because supersession already keeps exactly one current value
+per key, there is rarely a duplicate-key group left for an aggregator to collapse; the work
+CAR does at every read, \tenet{} does once at write. This is the belief-state thesis stated
+as a null result: the aggregation step that other systems need is redundant when the store
+is self-consistent by construction. (Retraction is the converse---an explicit ``forget
+$X$'' that deletes without replacement is semantically distinct from value supersession; a
+tombstone op is implemented but stays opt-in, as removing a fact entirely hurt a
+multiple-choice benchmark that needs the retracted context to recognize the retraction.)
+
 \section{Limitations}\label{sec:limits}
 \textbf{Verbatim-recall benchmarks favor raw storage.} On LoCoMo-10 ($n{=}500$
 stratified, qwen-judged, same reader/judge both arms) naive RAG beats \tenet{}
@@ -753,9 +781,19 @@ and the comparison is valid---but \tenet{} and RAG \emph{tie} ($50.5$ vs $50.9$,
 McNemar $p{=}0.92$), and on the retraction subset we predicted \tenet{} would win, RAG
 leads if anything ($74.2$ vs $67.7$, ns). Cause, measured: only $3.8\%$ of turns trigger
 keyed supersession because conversational ``I've switched to $X$'' rarely produces a
-distilled key that collides with the prior belief---the paraphrase gap again. This bounds
-our churn claim: it holds when updates carry a stable attribute (\S\ref{sec:churn},
-\S\ref{sec:fc}), not for free-form preference drift. (We repurposed PersonaMem's
+distilled key that collides with the prior belief---the paraphrase gap again. \emph{We
+then fixed this}: an LLM-free embedding key-resolution (a new fact supersedes a
+same-subject current fact whose attribute-key embedding is cosine $\ge 0.78$ and
+value-compatible, with the fact-text similarity floor raised to $0.66$ to reject
+shared-salient-word coincidences) plus a distiller constrained away from vague umbrella
+keys raises true-fire on an expanded labeled set (including adversarial shared-word
+negatives) from $40\%$ to $80\%$ at $0\%$ false-fire, lifts real PersonaMem firing
+$3.8\%\!\to\!\sim$7\% and overall accuracy $50.5\!\to\!53.4$, and passes every regression
+gate (default on, hardened). It does \emph{not} fully address explicit retractions
+(``forget $X$''), which are deletions, not value replacements---a tombstone mechanism is
+the separate next step. This bounds our churn claim: it holds when updates carry a stable
+attribute (\S\ref{sec:churn}, \S\ref{sec:fc}), and now degrades gracefully rather than
+sharply on free-form preference drift. (We repurposed PersonaMem's
 full-context task as retrieval, so absolute scores are not vendor-comparable;
 \texttt{BENCHMARK.md}~\S13.)
 \textbf{Multi-session synthesis} still trails RAG (42.9 vs 57.1) under
@@ -786,8 +824,12 @@ under knowledge churn where retrieval memory structurally collapses, exceeds the
 published single-hop conflict-resolution SOTA at its reader tier on a weaker backbone,
 and is the only published-competitive system on MemoryAgentBench whose ingestion and
 reads are both LLM-free. The belief-state view also yields time-travel and principled
-forgetting for free. We hope knowledge churn becomes a standard axis for evaluating agent
-memory.
+forgetting for free. The LLM-free read path is also cheap at scale: with a resident
+embedding matrix (built once, appended incrementally, matmul at query time) recall stays
+$\sim$11\,ms at $10^5$ stored facts and extrapolates to $\sim$24\,ms at $10^6$ (versus
+$>1$\,s and $\sim$10\,s for a re-load-per-query implementation), so RAM---not
+latency---is the eventual bound (\texttt{docs/SCALE.md}). We hope knowledge churn becomes
+a standard axis for evaluating agent memory.
 
 \paragraph{Reproducibility.} All code, harnesses, official-prompt copies, cached
 ingestion artifacts, and per-question dumps: \texttt{github.com/Nas01010101/tenet}

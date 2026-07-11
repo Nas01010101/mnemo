@@ -88,10 +88,15 @@ def flatten_history(chat: list[dict]):
     return rows
 
 
-def build_store(chat: list[dict], cache_dir: Path, cid: str, embedder):
+def build_store(chat: list[dict], cache_dir: Path, cid: str, embedder, retract: bool = False):
     """Ingest one persona's history into Tenet via ingest_session per chunk (keyed
     supersession, monotonic clock so later chunks are more recent). Cache store + turn
-    embeddings. Returns (Tenet, turn_vecs, turn_rows)."""
+    embeddings. Returns (Tenet, turn_vecs, turn_rows).
+
+    `retract` — docs/COMPARISON.md follow-up #3: route distiller-tagged
+    action="retract" facts (explicit "forget X") to core.retract() instead of
+    core.store(). Changes INGESTION, so a cache built with retract=False cannot be
+    reused for a retract=True run (or vice versa) — the cache_dir must differ."""
     turn_rows = flatten_history(chat)
     texts = [t for _, t in turn_rows]
     npz, dbp = cache_dir / f"{cid}.npz", cache_dir / f"{cid}.db"
@@ -107,7 +112,7 @@ def build_store(chat: list[dict], cache_dir: Path, cid: str, embedder):
              and str(t.get("content", "")).strip()]
     for i in range(0, len(umsgs), CHUNK):
         turns = [{"role": t["role"], "content": t["content"].strip()} for t in umsgs[i:i + CHUNK]]
-        m.ingest_session(turns, source=f"c{i//CHUNK}", valid_at=clock[0])
+        m.ingest_session(turns, source=f"c{i//CHUNK}", valid_at=clock[0], retract=retract)
         clock[0] += 3600
     clock[0] += 3600  # advance now just past ingestion for recall-time decay
     st = m.stats()
@@ -160,6 +165,10 @@ def main() -> int:
     ap.add_argument("--dump", default="")
     ap.add_argument("--out", default="")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--tenet-retract", action="store_true",
+                    help="route distiller-tagged action=retract facts to core.retract() "
+                         "at ingestion (docs/COMPARISON.md follow-up #3); default off. "
+                         "Changes ingestion — use a fresh --cache dir vs a non-retract run.")
     args = ap.parse_args()
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]
     assert config.LLM_PROVIDER == "qwen", "run against the shipped qwen backbone"
@@ -185,7 +194,7 @@ def main() -> int:
     for pid in sorted({r["pid"] for r in rows}):
         link = next(r["link"] for r in rows if r["pid"] == pid)
         chat = fetch_history(link, hist_dir)
-        stores[pid] = build_store(chat, cache_dir, f"p{pid}", embedder)
+        stores[pid] = build_store(chat, cache_dir, f"p{pid}", embedder, retract=args.tenet_retract)
         st = stores[pid][0].stats()
         sf = st["superseded"] / max(1, st["current"] + st["superseded"])
         sup_fracs.append(sf)

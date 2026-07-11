@@ -28,8 +28,9 @@ retrieval with **belief-anchored evidence expansion** — spending spare context
 query-relevant turns from the sessions the belief state already surfaced. Tenet holds
 **100% current-value accuracy across all levels of the templated single-attribute churn
 primitive** (where a strong RAG-memory falls to 50%; on the harder *paraphrased*
-multi-attribute ChurnBench, §4.8, this primitive claim is falsified and recovered by a
-read-time consistency fix, §4.9), matches strong RAG on retrieval recall (95–97.5%), and — with expansion — **matches its
+multi-attribute ChurnBench, §4.8, this claim was falsified, then fully recovered to
+100/100/100 — half-life 32, tied-for-first with delete-outright Mem0-style, LLM-free —
+by a read-time consistency rule plus write-side key-resolution, §4.9/§14), matches strong RAG on retrieval recall (95–97.5%), and — with expansion — **matches its
 one-shot answer accuracy at equal-or-lower token budget** (57.5% vs 57.5% under a gpt-4o
 reader) while retaining a high-efficiency operating point at **half the context** and the
 **best accuracy-per-token** of the systems we evaluate. Tenet thus traces an
@@ -291,17 +292,18 @@ The finding is **reader-robust**. On a cheaper `gpt-4o-mini` reader the parity p
 ahead (Tenet 60.0 vs RAG 55.0 QA at the same budgets); the efficiency point's per-token
 dominance holds across the `gpt-4o-mini` and `gpt-4o` readers we ran (≈1.6×).
 
-**Reader-generality at the frontier tier (2026-07-11).** The identical captured task set
-(fresh n=40 sample, seed 0, Qwen distiller) run through three 2026 frontier readers from
-independent families — `claude-sonnet-5`, `gpt-5.5`, `gemini-3.5-flash` — under one
-cross-family judge (`qwen3.7-plus`), zero exclusions: Tenet leads naive RAG in **6/6**
-(reader × operating point) comparisons — 90.0/90.0 vs 82.5 (Sonnet), 85.0/82.5 vs 77.5
-(GPT-5.5), 90.0/90.0 vs 82.5 (Gemini) — with accuracy-per-token ≈2× RAG at the
-efficiency point under every reader. Per-cell CIs overlap at this n; the evidence is the
-directional replication across families. Notably the multi-session weakness *inverts*
-under all three frontier readers (RAG 50–62.5 vs Tenet 75–87.5): a strong reader
-composes compact belief items across sessions better than it sifts a raw-turn pool.
-Artifacts: `docs/lme_multireader_results.json` + per-reader answer logs.
+**Reader-generality at the frontier tier (2026-07-11, un-batched of record).** The
+identical captured task set (fresh n=40, seed 0, Qwen distiller) was run through 2026
+frontier readers under one cross-family judge (`qwen3.7-plus`). A first pass batched 10
+questions per CLI call; a methodology audit flagged that as contaminable, so we re-ran two
+scriptable readers **one call per item** (`gpt-5.5`, `gemini-3.5-flash`) and re-judged —
+those are the numbers of record. Batching had inflated absolute accuracy ~2–17pp; the
+directional claims survive clean: Tenet ≥ RAG at both operating points on both readers
+(77.5/77.5 vs 75.0 GPT-5.5; 75.0/72.5 vs 70.0 Gemini), ≈1.9× accuracy-per-token at half
+context, and the multi-session weakness still *inverts* un-batched (RAG 50.0 vs Tenet
+62.5 on both). Per-cell CIs overlap at n=40; the evidence is the directional replication
+across two independently-isolated reader families. (Sonnet-5 ran via the batched subagent
+harness only — kept for completeness, not load-bearing.) Artifacts: `docs/lme_unbatched_*.jsonl`.
 
 **4.2 Knowledge churn (headline).** One fact updated *N* times amid distractors, k=6, 12
 principals/point:
@@ -474,10 +476,15 @@ without confidence intervals. Full tables and pipeline: `docs/BENCHMARK.md` §10
   at ~50.5% — memory is load-bearing, comparison valid — but Tenet ties RAG (50.5 vs 50.9,
   p=0.92), and on the retraction subset we predicted Tenet would win, RAG leads (74.2 vs
   67.7, ns). Only 3.8% of turns trigger keyed supersession because conversational "I've
-  switched to X" rarely yields a distilled key that collides with the prior belief. This
-  bounds the churn claim: it holds for stable-attribute updates (§4.2, §6), not free-form
-  preference drift. (BENCHMARK.md §13; we repurposed a full-context task as retrieval, so
-  absolute scores aren't vendor-comparable.)
+  switched to X" rarely yields a distilled key that collides with the prior belief. **We
+  then fixed this** (BENCHMARK.md §13.1): LLM-free embedding key-resolution (text-floor
+  hardened to 0.66 to reject shared-word coincidences) + a vague-key-free distiller raise
+  true-fire 40→80% at 0% false-fire on an expanded adversarial set, lift real PersonaMem
+  firing 3.8→~7% and overall 50.5→53.4%, passing every regression gate (default on). It
+  does *not* fully address explicit retractions ("forget X" = deletion, not replacement —
+  a tombstone is the next step). So the churn claim holds for stable-attribute updates
+  (§4.2, §6) and now degrades gracefully on free-form drift. (We repurposed a full-context
+  task as retrieval, so absolute scores aren't vendor-comparable.)
 - **Multi-session synthesis** is the one category where RAG still leads (42.9 vs 57.1).
   Belief-anchored expansion (§3.6) lifted it from 28.6 but does not close it: these questions
   need evidence from *several* sessions, and expansion only deepens the sessions the top-*k*

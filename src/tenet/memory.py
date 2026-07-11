@@ -14,11 +14,19 @@ via recall(as_of=...), while default recall returns only currently-true facts.
 
 Zero heavy deps: sqlite (stdlib) + numpy. Brute-force cosine — fine at hackathon scale
 (<1e5 memories); swap in sqlite-vec later without touching the API.
+
+Scale (docs/SCALE.md): the embedding matrix + bi-temporal metadata are RESIDENT in
+memory (`.index.ResidentIndex`), built once and updated incrementally on
+store()/forget_sweep() — recall() no longer re-`SELECT`s and re-deserializes the whole
+table on every call (measured: 356ms of a 1055ms call at 100k facts, gone). See
+`index.py`'s module docstring for the full design (growth strategy, multi-process
+staleness detection, what's still O(n) Python and why).
 """
 from __future__ import annotations
 
 import math
 import os
+import re
 import sqlite3
 import threading
 import time
@@ -28,8 +36,10 @@ from pathlib import Path
 import numpy as np
 
 from . import config
+from .aggregate import aggregate_by_key
 from .consistency import stale_raw_ids
 from .dynamics import Dynamics
+from .index import ResidentIndex
 from .navigate import navigate as _navigate
 
 # TENET_DB_PATH lets callers (tests, mcp_server's module-level default Tenet())
@@ -60,6 +70,89 @@ elif _CONSISTENCY_ENV.replace(".", "", 1).isdigit():
     _CONSISTENCY_THRESHOLD_DEFAULT = float(_CONSISTENCY_ENV)
 else:
     _CONSISTENCY_THRESHOLD_DEFAULT = None
+
+# Read-time recency aggregation (aggregate.py, docs/COMPARISON.md follow-up #1) —
+# an OPTIONAL CAR-style max(serial)-equivalent pool de-conflicting pass, LLM-free
+# (Tenet's `valid_at` already IS the serial-equivalent signal). Default OFF until
+# measured to help; TENET_AGG_READER=1 (or recall(..., agg_reader=True) per call)
+# opts in.
+_AGG_READER_DEFAULT = os.environ.get("TENET_AGG_READER", "").strip().lower() in ("1", "true", "on", "yes")
+
+
+# --- Embedding-based key resolution (TENET_KEY_RESOLUTION) ------------------
+# The per-message distiller keys the SAME real-world attribute inconsistently
+# ("user::milk_preference" one turn, "user::milk" the next), so exact-skey
+# collision misses most natural-language preference updates (measured true-fire
+# 3.8% on PersonaMem-v2 retractions, BENCHMARK.md §13 — the reason we tied/lost
+# on preference-drift while winning on stable-attribute churn). When ON, store()
+# ALSO supersedes a current fact of the SAME subject whose attribute key is
+# embedding-near this one (cosine >= _TAU_KEY) and value-compatible (not a
+# sub-attribute of it). Fully LLM-free — reuses the fact embedder on the short
+# attribute slug. Default is env-driven and runtime-overridable (the firing
+# benchmark sweeps _TAU_KEY on a labeled set; see scripts/bench_supersession_firing.py).
+def _env_off(name: str, default_on: bool) -> bool:
+    v = os.environ.get(name, "").strip().lower()
+    if not v:
+        return default_on
+    return v not in ("0", "off", "false", "no")
+
+
+# Default flipped ON 2026-07-10 after the firing-fix gates passed (see
+# scripts/bench_supersession_firing.py + scratchpad/supersession_fix.md).
+# Force off with TENET_KEY_RESOLUTION=off.
+_KEY_RESOLUTION = _env_off("TENET_KEY_RESOLUTION", default_on=True)
+_TAU_KEY = float(os.environ.get("TENET_KEY_RESOLUTION_TAU", "0.78"))  # swept: 80% true-fire
+# _TEXT_FLOOR raised 0.35->0.66 (2026-07-10) after a shared-salient-word false-supersession
+# ("user::surface_probe" vs "user::temporal_probe": both key AND text share "probe", clearing
+# tau but NOT a 0.66 fact-text floor). Swept on the labeled set incl. 4 adversarial shared-word
+# negatives: 0.66 gives 80% true-fire at 0% false-fire (robust across the 0.62-0.72 band; true-fire
+# is unchanged from the old 0.35, so the floor costs nothing). The fact-text cosine is the clean
+# separator — shared-word-but-different-fact pairs sit at <=0.70, real value-updates at >=0.72.
+_TEXT_FLOOR = float(os.environ.get("TENET_KEY_RESOLUTION_TEXTFLOOR", "0.66"))
+# Sub-attribute qualifiers: a key whose attribute is <another attribute> + one of
+# these names a DIFFERENT property of the same object (pet vs pet_name, car vs
+# car_color) — an update to one must never supersede the other. Meta qualifiers
+# (preference/current/favorite/…) are deliberately NOT here, so "milk" and
+# "milk_preference" DO collapse onto the same slot.
+_SUB_ATTR_TOKENS = frozenset({
+    "name", "brand", "color", "colour", "type", "model", "id", "number", "num",
+    "count", "size", "age", "price", "cost", "date", "time", "year", "location",
+    "city", "address", "owner", "maker", "author", "title", "breed", "make",
+})
+
+
+def _split_key(k: str) -> tuple[str, str]:
+    # rpartition on the LAST "::" so multi-segment namespaces (the LangGraph store
+    # joins namespace+key into one skey, e.g. "users::alex::prefs") keep the whole
+    # namespace as the subject and only the final segment as the attribute — otherwise
+    # "users::alex::prefs" and "users::sam::prefs" would share subject "users" and be
+    # wrongly collapsed across users. For the distiller's 2-segment "user::milk" this
+    # is identical to a first-"::" split.
+    subj, _, attr = k.rpartition("::")
+    return subj, attr
+
+
+def _key_tokens(attr: str) -> set[str]:
+    return {t for t in re.split(r"[_\W]+", attr.lower()) if t}
+
+
+def _value_compatible(new_key: str, old_key: str) -> bool:
+    """True if `new_key` may supersede `old_key`: SAME subject and NOT a
+    sub-attribute refinement of the other. Blocks pet=dog vs pet_name=Rex and
+    car vs car_color from collapsing, while keeping milk vs milk_preference
+    compatible (the extra 'preference' token is not a sub-attribute qualifier)."""
+    ns, na = _split_key(new_key)
+    os_, oa = _split_key(old_key)
+    if ns != os_ or not na or not oa:
+        return False
+    ta, tb = _key_tokens(na), _key_tokens(oa)
+    if ta == tb:
+        return True
+    if ta < tb and (tb - ta) & _SUB_ATTR_TOKENS:
+        return False
+    if tb < ta and (ta - tb) & _SUB_ATTR_TOKENS:
+        return False
+    return True
 
 
 @dataclass
@@ -95,6 +188,15 @@ class MemoryCore:
         self.db = sqlite3.connect(self.db_path, check_same_thread=False)
         self._lock = threading.RLock()
         self.db.row_factory = sqlite3.Row
+        # WAL: commit is a WAL-file append instead of the rollback-journal's
+        # create+write+fsync+delete dance — the leading hypothesis (docs/SCALE.md
+        # "ingestion ceiling") for why per-insert commit() throughput collapsed with
+        # store size. synchronous=NORMAL is the standard WAL pairing: still durable
+        # across an app crash (committed transactions survive), only the last WAL
+        # page is at risk on an OS crash/power loss — the accepted trade for a
+        # per-call fsync that no longer scales with file size.
+        self.db.execute("PRAGMA journal_mode=WAL")
+        self.db.execute("PRAGMA synchronous=NORMAL")
         self.db.execute(
             """CREATE TABLE IF NOT EXISTS memories (
                  id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -122,6 +224,33 @@ class MemoryCore:
         self._client = None
         self._dyn: Dynamics | None = None   # learned fact dynamics (lazily fitted)
         self._dyn_dirty = True
+        self._key_vec_cache: dict[str, np.ndarray] = {}  # attribute-slug embeddings (key resolution)
+        self._index: ResidentIndex | None = None  # lazily built — see _ensure_index
+
+    # ---- resident index (docs/SCALE.md) -----------------------------------
+    def _ensure_index(self, dim_hint: int | None = None) -> None:
+        """Build the resident index on first use, or refresh it if another process
+        (a second HTTP/FC worker on the same db file) has written since our last
+        build (`PRAGMA data_version` — cheap, O(1), never trips on OUR OWN writes
+        since those are already applied incrementally by store()/forget_sweep()).
+
+        `dim_hint`: the embedding dimensionality, needed to size a brand-new index
+        when the table is still empty (nothing to infer it from) — store() always
+        knows this from its own vector; recall()/_nearest_current() on a store that
+        already has rows infer it from the first row instead and don't need the hint.
+        """
+        if self._index is not None:
+            if self._index.is_stale(self.db):
+                self._index.refresh(self.db)
+            return
+        row = self.db.execute("SELECT embedding FROM memories LIMIT 1").fetchone()
+        if row is not None:
+            d = len(row["embedding"]) // 4  # float32
+        elif dim_hint is not None:
+            d = dim_hint
+        else:
+            return  # nothing to build yet and no hint (empty store, read-only call)
+        self._index = ResidentIndex.build(self.db, d)
 
     # ---- embedding -------------------------------------------------------
     def _embed(self, text: str) -> np.ndarray:
@@ -165,58 +294,234 @@ class MemoryCore:
         if not text:
             raise ValueError("empty memory")
         vec = _vec if _vec is not None else self._embed(text)  # network call — outside the lock
-        t = self._now()
-        va = valid_at if valid_at is not None else t
         with self._lock:
-            if kind == "raw":
-                # World-model efficiency (predictive-coding principle): only store a raw
-                # observation the memory does NOT already predict. If it's near-identical
-                # to an existing raw slice (cosine >= surprise_gate), it carries no new
-                # information — skip it. Shrinks the store without losing novel detail.
-                if surprise_gate is not None:
-                    for r in self.db.execute(
-                        "SELECT embedding FROM memories WHERE kind='raw' AND archived=0 "
-                        "AND expired_at IS NULL"
-                    ).fetchall():
-                        if float(np.dot(vec, np.frombuffer(r["embedding"], dtype=np.float32))) >= surprise_gate:
-                            return -1  # redundant observation, not stored
-            elif key is not None:
-                prior = self.db.execute(
-                    "SELECT id, text, pinned, salience FROM memories "
-                    "WHERE skey=? AND archived=0 AND expired_at IS NULL",
-                    (key,),
-                ).fetchall()
-                for row in prior:
-                    if row["text"] == text:
-                        self._touch(row["id"])
-                        return row["id"]          # exact restatement of a keyed fact
-                for row in prior:                 # same key, new value ⇒ supersede all priors
-                    # A pinned/high-salience fact-slot keeps those properties across
-                    # value updates (pinning "residence" survives a move).
-                    pinned = pinned or bool(row["pinned"])
-                    salience = max(salience, row["salience"])
-                    self.db.execute(
-                        "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
-                        (va, t, row["id"]),
-                    )
-            else:
-                hit = self._nearest_current(vec)  # (id, sim, text)
-                if hit and hit[1] >= dedup:
-                    self._touch(hit[0])
-                    return hit[0]
-                if hit and hit[1] >= supersede and hit[2] != text:
-                    self.db.execute(
-                        "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
-                        (va, t, hit[0]),
-                    )
-            cur = self.db.execute(
-                "INSERT INTO memories(text, kind, source, skey, embedding, salience, valid_at, "
-                "created_at, last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
+            row_id = self._store_locked(
+                text, key=key, kind=kind, source=source, pinned=pinned, salience=salience,
+                valid_at=valid_at, supersede=supersede, dedup=dedup,
+                surprise_gate=surprise_gate, vec=vec,
             )
             self.db.commit()
             self._dyn_dirty = True  # ledger changed -> refit dynamics lazily
-            return cur.lastrowid
+            return row_id
+
+    def store_many(self, items: list[dict]) -> list[int]:
+        """Bulk insert with ONE commit for the whole batch, instead of store()'s one
+        commit per item — the fix for per-call synchronous commit dominating
+        ingestion throughput at scale (docs/SCALE.md "ingestion ceiling"; also see
+        the WAL pragmas in `__init__`, which help every commit including this one).
+
+        Each item is the same kwargs `store()` takes (`text` plus any of `key`,
+        `kind`, `source`, `pinned`, `salience`, `valid_at`, `supersede`, `dedup`,
+        `surprise_gate`, `_vec`). Per-item supersession/dedup/restatement semantics
+        are UNCHANGED — this only changes when the transaction commits, not what
+        each item does or its return value (a list of ids, same order as `items`,
+        `-1` for a skipped surprise-gated raw observation, same as store()).
+
+        Embeddings for items without `_vec` are computed via ONE batched
+        `embed_batch()` call up front (outside the lock, same as store()'s single-
+        item path) rather than one call per item — a real API-based embedder pays
+        one round-trip instead of N.
+        """
+        if not items:
+            return []
+        need_embed = [i for i, it in enumerate(items) if it.get("_vec") is None]
+        if need_embed:
+            texts = [items[i]["text"].strip() for i in need_embed]
+            vecs = self.embed_batch(texts)
+            for i, v in zip(need_embed, vecs):
+                items[i] = {**items[i], "_vec": v}
+        ids: list[int] = []
+        with self._lock:
+            for it in items:
+                text = it["text"].strip()
+                if not text:
+                    raise ValueError("empty memory")
+                ids.append(self._store_locked(
+                    text, key=it.get("key"), kind=it.get("kind", "fact"),
+                    source=it.get("source"), pinned=it.get("pinned", False),
+                    salience=it.get("salience", 0.5), valid_at=it.get("valid_at"),
+                    supersede=it.get("supersede", 0.90), dedup=it.get("dedup", 0.985),
+                    surprise_gate=it.get("surprise_gate"), vec=it["_vec"],
+                ))
+            self.db.commit()
+            self._dyn_dirty = True
+        return ids
+
+    def _store_locked(self, text: str, *, key, kind, source, pinned, salience,
+                       valid_at, supersede, dedup, surprise_gate, vec: np.ndarray) -> int:
+        """Everything store()/store_many() do per item EXCEPT acquiring the lock and
+        committing — so store_many() can run many of these in one transaction.
+        Caller MUST hold self._lock. Mirrors every DB mutation into the resident
+        index incrementally (append/mark_expired), so recall() never needs to
+        re-query for what THIS process just wrote."""
+        t = self._now()
+        va = valid_at if valid_at is not None else t
+        self._ensure_index(dim_hint=vec.shape[0])
+        idx = self._index
+
+        if kind == "raw":
+            # World-model efficiency (predictive-coding principle): only store a raw
+            # observation the memory does NOT already predict. If it's near-identical
+            # to an existing raw slice (cosine >= surprise_gate), it carries no new
+            # information — skip it. Shrinks the store without losing novel detail.
+            # Vectorized (was a Python for-loop over every raw row — docs/SCALE.md).
+            if surprise_gate is not None and idx is not None and idx.size:
+                mask = idx.mask_raw_current()
+                if mask.any():
+                    sims = idx.matrix[: idx.size][mask] @ vec
+                    if float(sims.max()) >= surprise_gate:
+                        return -1  # redundant observation, not stored
+        elif key is not None:
+            prior = self.db.execute(
+                "SELECT id, text, pinned, salience FROM memories "
+                "WHERE skey=? AND archived=0 AND expired_at IS NULL",
+                (key,),
+            ).fetchall()
+            for row in prior:
+                if row["text"] == text:
+                    self._touch_locked(row["id"])
+                    return row["id"]          # exact restatement of a keyed fact
+            superseded_ids = []
+            for row in prior:                 # same key, new value ⇒ supersede all priors
+                # A pinned/high-salience fact-slot keeps those properties across
+                # value updates (pinning "residence" survives a move).
+                pinned = pinned or bool(row["pinned"])
+                salience = max(salience, row["salience"])
+                self.db.execute(
+                    "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                    (va, t, row["id"]),
+                )
+                superseded_ids.append(row["id"])
+            if superseded_ids and idx is not None:
+                idx.mark_expired(superseded_ids, va, t)
+            # Embedding-based key resolution: also retire same-subject current facts
+            # whose attribute key the distiller spelled differently (milk vs
+            # milk_preference) — the fix for the 3.8% NL-update fire rate. Guarded
+            # (value_compatible + text floor) so distinct attributes never collapse.
+            if _KEY_RESOLUTION:
+                p2, s2, ids2 = self._resolve_key_supersede(key, vec, va, t)
+                pinned = pinned or p2
+                salience = max(salience, s2)
+                if ids2 and idx is not None:
+                    idx.mark_expired(ids2, va, t)
+        else:
+            hit = self._nearest_current(vec)  # (id, sim, text)
+            if hit and hit[1] >= dedup:
+                self._touch_locked(hit[0])
+                return hit[0]
+            if hit and hit[1] >= supersede and hit[2] != text:
+                self.db.execute(
+                    "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                    (va, t, hit[0]),
+                )
+                if idx is not None:
+                    idx.mark_expired([hit[0]], va, t)
+        cur = self.db.execute(
+            "INSERT INTO memories(text, kind, source, skey, embedding, salience, valid_at, "
+            "created_at, last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
+        )
+        row_id = cur.lastrowid
+        if idx is not None:
+            idx.append(id=row_id, text=text, kind=kind, source=source, skey=key,
+                       embedding=vec, salience=float(salience), valid_at=va,
+                       created_at=t, last_access=t, pinned=bool(pinned))
+        return row_id
+
+    # ---- retraction / tombstone (docs/COMPARISON.md follow-up #3) ------------
+    def retract(self, key: str, *, valid_at: float | None = None) -> int:
+        """Explicit "forget X" — retire every CURRENT fact under `key` WITHOUT
+        replacing it with a new value. Distinct from supersession (store()'s keyed
+        path), which retires-then-REPLACES: a retraction is a pure deletion of the
+        belief, not a value update. Reuses the same bi-temporal machinery
+        (invalid_at/expired_at) supersession does, so the effect on recall is
+        identical in kind — current recall() no longer returns it, `recall(as_of=t)`
+        for t before the retraction still does (history isn't erased, matching
+        every other "retire" path in this store) — but no new row is inserted, so
+        there is no "current value" to report afterward; `uncertain_facts()` and
+        `list_beliefs()` correctly show nothing current for this key post-retraction.
+
+        Returns the number of rows retracted (0 if nothing was current under `key`).
+        Pinned facts ARE retractable (an explicit "forget X" should win over a pin —
+        unlike the forgetting SWEEP, which never touches pinned facts; a user asking
+        to forget something is a stronger, explicit signal than decay)."""
+        t = self._now()
+        va = valid_at if valid_at is not None else t
+        with self._lock:
+            self._ensure_index()
+            rows = self.db.execute(
+                "SELECT id FROM memories WHERE skey=? AND archived=0 AND expired_at IS NULL",
+                (key,),
+            ).fetchall()
+            if not rows:
+                return 0
+            ids = [r["id"] for r in rows]
+            self.db.executemany(
+                "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                [(va, t, i) for i in ids],
+            )
+            self.db.commit()
+            self._dyn_dirty = True
+            if self._index is not None:
+                self._index.mark_expired(ids, va, t)
+            return len(ids)
+
+    def _key_emb(self, key: str) -> np.ndarray:
+        """Embedding of a key's readable ATTRIBUTE slug (subject stripped so the shared
+        'user::' prefix doesn't inflate every pair's similarity). Cached per key."""
+        v = self._key_vec_cache.get(key)
+        if v is None:
+            _subj, attr = _split_key(key)
+            v = self._embed((attr.replace("_", " ") or key).strip())
+            self._key_vec_cache[key] = v
+        return v
+
+    def _resolve_key_supersede(self, key: str, text_vec: np.ndarray,
+                               va: float, t: float) -> tuple[bool, float, list[int]]:
+        """Supersede current same-subject facts whose attribute key is embedding-near
+        `key` (cosine >= _TAU_KEY) and value-compatible. Returns (any_pinned,
+        max_salience, superseded_ids) — the third so the caller can mirror the
+        UPDATE into the resident index (docs/SCALE.md) without this method needing
+        to know about it. Runs inside store()'s lock. LLM-free.
+
+        Candidate lookup is resident-index-backed (`ResidentIndex.rows_for_subject`,
+        an incrementally-maintained subject->positions dict), NOT the SQL this used
+        to run: `EXPLAIN QUERY PLAN` on the original `... skey LIKE ?` query showed
+        `SCAN memories` — sqlite does NOT use the skey index for a LIKE prefix search
+        combined with the surrounding non-indexed AND-conditions here, so this was a
+        full-table scan on every keyed insert, confirmed as the dominant remaining
+        cause of ingestion throughput degrading with store size after the resident
+        matrix + WAL fixes (docs/SCALE.md "ingestion ceiling", before/after table)."""
+        subj, _ = _split_key(key)
+        if not subj:
+            return False, 0.0, []
+        self._ensure_index(dim_hint=text_vec.shape[0])
+        if self._index is None:
+            return False, 0.0, []
+        rows = self._index.rows_for_subject(subj, exclude_skey=key)
+        if not rows:
+            return False, 0.0, []
+        nk = self._key_emb(key)
+        any_pinned, max_sal, superseded_ids = False, 0.0, []
+        for row in rows:
+            ok = row["skey"]
+            if not _value_compatible(key, ok):
+                continue
+            if float(np.dot(nk, self._key_emb(ok))) < _TAU_KEY:
+                continue
+            # domain floor on the FACT texts: a spuriously high key-sim must not collapse
+            # two facts that are actually about unrelated things.
+            ov = np.frombuffer(row["embedding"], dtype=np.float32)
+            if float(np.dot(text_vec, ov)) < _TEXT_FLOOR:
+                continue
+            any_pinned = any_pinned or bool(row["pinned"])
+            max_sal = max(max_sal, float(row["salience"]))
+            self.db.execute(
+                "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                (va, t, row["id"]),
+            )
+            superseded_ids.append(row["id"])
+        return any_pinned, max_sal, superseded_ids
 
     # ---- recall ----------------------------------------------------------
     def recall(
@@ -229,6 +534,7 @@ class MemoryCore:
         expand: int = 0,
         hops: int = 0,
         consistency_threshold: float | None = _CONSISTENCY_THRESHOLD_DEFAULT,
+        agg_reader: bool = _AGG_READER_DEFAULT,
     ) -> list[Memory]:
         """Most relevant memories, ranked by relevance × decay.
 
@@ -263,17 +569,28 @@ class MemoryCore:
         already know the current value for that key, so a close paraphrase of an old
         one is confirmed-stale, not just embedding-adjacent. Only affects which raw
         slices are eligible; current-fact ranking is byte-identical with this on or off.
+
+        `agg_reader` — OPTIONAL CAR-style read-time recency aggregation
+        (aggregate.py, docs/COMPARISON.md follow-up #1): if the returned pool has
+        more than one memory sharing the same `key`, keep only the highest-`valid_at`
+        member of each group (LLM-free max(serial)-equivalent, since `valid_at` IS
+        the serial-equivalent signal). Default OFF (`_AGG_READER_DEFAULT`,
+        `TENET_AGG_READER=1` to opt in globally). Runs LAST, after expand/hops, so it
+        sees the final pool; a pure filter (drops entries, never reorders/rescopes
+        the ones that survive) — does not touch the annotation-only ranking
+        invariant.
         """
         qv = self._embed(query)  # network call — kept outside the lock
         with self._lock:
-            rows = self._rows_as_of(as_of)
+            rows, mat, decay_vec = self._rows_matrix_decay_as_of(as_of)
             if not rows:
                 return []
-            # One BLAS matmul instead of a per-row python loop (docs/HARNESS.md §3:
-            # 28-33× on the scoring step; deserialization done once, contiguously).
-            mat = np.frombuffer(
-                b"".join(row["embedding"] for row in rows), dtype=np.float32
-            ).reshape(len(rows), -1)
+            # One BLAS matmul against the RESIDENT matrix (docs/SCALE.md) — no sqlite
+            # fetch and no per-row deserialization on the way in; this was 356ms of a
+            # 1055ms call at 100k facts (4 hidden full-table SELECTs: this one, plus
+            # the ones inside _dynamics/_expired_fact_matrix/_expired_keyed_rows
+            # below, all now index-backed too), the matmul itself was always cheap
+            # (docs/HARNESS.md §3: 2.6ms at 100k).
             rels = mat @ qv                               # cosine (both unit)
             # World-model layer: annotate each keyed fact with the LEARNED probability
             # it is still the current truth (dynamics.py — per-key-class survival
@@ -287,13 +604,17 @@ class MemoryCore:
             conf: dict[int, float] = {}
             if dyn is not None:
                 for row in rows:
+                    if row["kind"] == "raw" or row["skey"] is None:
+                        continue  # _p_valid returns None for these anyway — skip the call
                     p = self._p_valid(row, dyn, now)
                     if p is not None:
                         conf[row["id"]] = p
 
+            # decay_vec is vectorized (docs/SCALE.md — was a Python for-loop calling
+            # _decay(row) once per row: math.pow/math.log1p each time, 94ms at 100k).
             scored = [
-                (float(rel) * self._decay(row), float(rel), row)
-                for rel, row in zip(rels, rows)
+                (float(rel) * float(dec), float(rel), row)
+                for rel, dec, row in zip(rels, decay_vec, rows)
             ]
             scored.sort(key=lambda x: x[0], reverse=True)
 
@@ -404,7 +725,7 @@ class MemoryCore:
                         pool_vecs.append(np.frombuffer(row["embedding"], dtype=np.float32))
                         taken += 1
                     fresh_rows = [row for row in fresh_rows if row["id"] not in have]
-            return out
+            return aggregate_by_key(out) if agg_reader else out
 
     # ---- adaptive navigation (LLM-free multi-hop) -------------------------
     def navigate(
@@ -435,11 +756,16 @@ class MemoryCore:
         bge-small local embedder it was trained on (EMBED_PROVIDER=local, 384d)."""
         if self._dyn is not None and not self._dyn_dirty:
             return self._dyn
-        rows = self.db.execute(
-            "SELECT skey, valid_at, invalid_at, embedding FROM memories "
-            "WHERE kind='fact' AND skey IS NOT NULL AND archived=0"
-        ).fetchall()
-        import os
+        # Index-backed (docs/SCALE.md) — was its own full-table SELECT on every
+        # refit; Dynamics.fit()/build_from_ledger() themselves are UNCHANGED, only
+        # their input's source moved from sqlite to the resident index.
+        self._ensure_index()
+        if self._index is not None:
+            idx = self._index
+            mask = (~idx.is_raw[: idx.size]) & idx.has_skey[: idx.size]
+            rows = idx.rows_for_mask(mask)
+        else:
+            rows = []
         nd = None
         if os.environ.get("TENET_DYNAMICS", "").lower() == "neural":
             from .dynamics_neural import build_from_ledger  # numpy-only world model
@@ -529,69 +855,114 @@ class MemoryCore:
     def forget_sweep(self) -> int:
         """Archive current memories whose decay score fell below threshold
         (pinned never forgotten). Superseded/expired facts are left in place as
-        history but excluded from current recall. Returns count archived."""
-        n = 0
+        history but excluded from current recall. Returns count archived.
+        Vectorized (docs/SCALE.md) — was a Python for-loop calling `_decay(row)`
+        once per current row; the resident index is also compacted (rows physically
+        removed, not just flagged) so recall() never has to filter them again."""
         with self._lock:
-            for row in self._current_rows():
-                if not row["pinned"] and self._decay(row) < _FORGET_THRESHOLD:
-                    self.db.execute("UPDATE memories SET archived=1 WHERE id=?", (row["id"],))
-                    n += 1
+            self._ensure_index()
+            if self._index is None:
+                return 0
+            idx = self._index
+            mask_cur = idx.mask_current()
+            if not mask_cur.any():
+                return 0
+            decay = idx.decay(self._now(), _HALFLIFE_S)
+            to_archive = mask_cur & (~idx.pinned[: idx.size]) & (decay < _FORGET_THRESHOLD)
+            ids = [int(idx.ids[p]) for p in np.flatnonzero(to_archive)]
+            if not ids:
+                return 0
+            self.db.executemany("UPDATE memories SET archived=1 WHERE id=?", [(i,) for i in ids])
             self.db.commit()
-        return n
+            idx.remove(ids)
+            return len(ids)
 
-    # ---- helpers ---------------------------------------------------------
+    # ---- helpers -----------------------------------------------------------
+    # All resident-index-backed now (docs/SCALE.md) — no SQL, no per-row
+    # `np.frombuffer` deserialization; that used to be 4 separate full-table
+    # `fetchall()`s hidden inside one `recall()` call (356ms of 1055ms at 100k).
     def _current_rows(self):
         """Live, currently-true memories (not archived, not superseded)."""
-        return self.db.execute(
-            "SELECT * FROM memories WHERE archived=0 AND expired_at IS NULL"
-        ).fetchall()
+        self._ensure_index()
+        if self._index is None:
+            return []
+        return self._index.rows_for_mask(self._index.mask_current())
 
     def _rows_as_of(self, as_of: float | None):
         if as_of is None:
             return self._current_rows()
-        # time-travel: facts the system knew (created_at<=t) and hadn't retired
-        # (expired_at IS NULL OR expired_at>t), that were true in the world then.
-        return self.db.execute(
-            "SELECT * FROM memories WHERE archived=0 AND created_at<=? "
-            "AND (expired_at IS NULL OR expired_at>?) "
-            "AND valid_at<=? AND (invalid_at IS NULL OR invalid_at>?)",
-            (as_of, as_of, as_of, as_of),
-        ).fetchall()
+        self._ensure_index()
+        if self._index is None:
+            return []
+        return self._index.rows_for_mask(self._index.mask_as_of(as_of))
+
+    def _rows_matrix_decay_as_of(self, as_of: float | None):
+        """(rows, embedding submatrix, decay array) for recall()'s scoring pass, in
+        one shot — the fetch+deserialize+decay-loop replacement. `rows`/`mat`/`decay`
+        are index-aligned (same order, same length)."""
+        self._ensure_index()
+        if self._index is None:
+            return [], None, None
+        idx = self._index
+        mask = idx.mask_current() if as_of is None else idx.mask_as_of(as_of)
+        if not mask.any():
+            return [], None, None
+        rows, mat = idx.rows_and_matrix_for_mask(mask)
+        decay = idx.decay(self._now(), _HALFLIFE_S)[mask]
+        return rows, mat, decay
 
     def _expired_fact_matrix(self):
         """Embeddings of superseded (expired) facts — the retired belief values.
         Returns an (M×d) matrix or None."""
-        rows = self.db.execute(
-            "SELECT embedding FROM memories WHERE kind='fact' AND expired_at IS NOT NULL "
-            "AND archived=0"
-        ).fetchall()
-        if not rows:
+        self._ensure_index()
+        if self._index is None:
             return None
-        return np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in rows])
+        idx = self._index
+        mask = idx.mask_expired_fact()
+        if not mask.any():
+            return None
+        return idx.matrix[: idx.size][mask]
 
     def _expired_keyed_rows(self):
         """Superseded KEYED facts (id, skey, embedding) — consistency.py's key-scoped
         input; a superset of `_expired_fact_matrix`'s rows filtered to skey IS NOT NULL,
         fetched separately since that helper only returns bare embeddings."""
-        return self.db.execute(
-            "SELECT id, skey, embedding FROM memories WHERE kind='fact' "
-            "AND expired_at IS NOT NULL AND skey IS NOT NULL AND archived=0"
-        ).fetchall()
+        self._ensure_index()
+        if self._index is None:
+            return []
+        return self._index.rows_for_mask(self._index.mask_expired_keyed_fact())
 
     def _nearest_current(self, vec: np.ndarray):
-        best = None
-        for row in self._current_rows():
-            emb = np.frombuffer(row["embedding"], dtype=np.float32)
-            sim = float(np.dot(vec, emb))
-            if best is None or sim > best[1]:
-                best = (row["id"], sim, row["text"])
-        return best
+        """Highest-cosine current row (unkeyed store()'s dedup/supersede path).
+        Vectorized (docs/SCALE.md) — was a Python for-loop computing one dot
+        product per current row (`_nearest_current`'s namesake unvectorized scan,
+        confirmed O(n) per insert -> O(n^2) total for bulk unkeyed ingestion)."""
+        self._ensure_index(dim_hint=vec.shape[0])
+        idx = self._index
+        if idx is None or idx.size == 0:
+            return None
+        mask = idx.mask_current()
+        if not mask.any():
+            return None
+        n = idx.size
+        sims = idx.matrix[:n] @ vec
+        sims = np.where(mask, sims, -np.inf)
+        best_pos = int(np.argmax(sims))  # first-encountered on ties, matches the old `sim > best[1]`
+        return (int(idx.ids[best_pos]), float(sims[best_pos]), idx.text[best_pos])
+
+    def _touch_locked(self, mem_id: int) -> None:
+        """Bump uses/last_access, no commit — caller (store()/store_many() via
+        _store_locked) commits once for the whole batch."""
+        now = self._now()
+        self.db.execute("UPDATE memories SET uses=uses+1, last_access=? WHERE id=?", (now, mem_id))
+        if self._index is not None:
+            self._index.touch(mem_id, now)
 
     def _touch(self, mem_id: int):
-        self.db.execute(
-            "UPDATE memories SET uses=uses+1, last_access=? WHERE id=?",
-            (self._now(), mem_id),
-        )
+        """Bump uses/last_access and commit immediately — caller must already hold
+        self._lock (recall() does). A single small UPDATE per touched result, not
+        the bulk-insert case store_many() exists for."""
+        self._touch_locked(mem_id)
         self.db.commit()
 
     def _to_memory(self, row, score: float, confidence: float | None = None) -> Memory:

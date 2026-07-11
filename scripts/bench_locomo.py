@@ -215,6 +215,9 @@ def main() -> int:
     ap.add_argument("--dump", default="")
     ap.add_argument("--out", default="")
     ap.add_argument("--smoke", action="store_true")
+    ap.add_argument("--tenet-agg", action="store_true",
+                    help="opt into recall()'s CAR-style read-time recency aggregation "
+                         "(docs/COMPARISON.md follow-up #1) on the tenet arm; default off")
     args = ap.parse_args()
     if args.smoke:
         args.sample = 0  # all questions of the single conv we keep below
@@ -262,7 +265,7 @@ def main() -> int:
             top = np.argsort(-(turn_vecs @ qv))[: args.k]
             ctx["rag"] = "\n".join(turn_rows[i][1] for i in sorted(top))
         if "tenet" in arms:
-            hits = m.core.recall(q, k=args.k, expand=args.expand)
+            hits = m.core.recall(q, k=args.k, expand=args.expand, agg_reader=args.tenet_agg)
             ctx["tenet"] = "\n".join(h.text for h in hits)
         idx = len(recs)
         recs.append({"ci": ci, "q": q, "cat": cat, "gold": gold,
