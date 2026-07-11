@@ -18,9 +18,18 @@ from . import config
 _MODEL = config.get("QWEN_DISTILL_MODEL", "qwen3.6-flash")
 
 _SYS = """You extract durable, atomic facts from a message for an agent's long-term memory.
-Return STRICT JSON: {"facts": [{"statement","key","salience","valid_at"}...]}.
+Return STRICT JSON: {"facts": [{"statement","key","salience","valid_at","action"}...]}.
 
 Rules:
+- action: "remember" (default — a fact to store, may supersede an older value) or
+  "retract" — use "retract" ONLY when the message EXPLICITLY asks to forget, delete,
+  or stop remembering something ("forget my old address", "please delete that",
+  "don't remember I said that", "erase what I told you about my ex"). An ordinary
+  value change ("I moved to Toronto") is action="remember", NOT "retract" — the new
+  value replaces the old one automatically; that is a different mechanism. For a
+  retract fact, `key` MUST be the "subject::attribute" key of the thing being
+  forgotten (so the store knows what to retire) and `statement` briefly names what
+  was forgotten, for logging. When unsure, use "remember".
 - statement: one self-contained fact. Resolve pronouns to names. No fluff.
   PRESERVE specific values VERBATIM — numbers, dates, times, durations, quantities,
   prices, proper nouns (e.g. keep "2 days", "March 3 at 14:20", "$50", "gate B12").
@@ -54,6 +63,7 @@ class Fact:
     key: str
     salience: float
     valid_at_iso: str | None
+    action: str = "remember"  # "remember" | "retract" (docs/COMPARISON.md follow-up #3)
 
 
 def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
@@ -88,5 +98,8 @@ def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
             sal = float(f.get("salience", 0.5))
         except (TypeError, ValueError):
             sal = 0.5
-        out.append(Fact(stmt, key, max(0.0, min(1.0, sal)), f.get("valid_at") or None))
+        action = str(f.get("action") or "remember").strip().lower()
+        if action != "retract":
+            action = "remember"  # unrecognized/missing -> the safe default
+        out.append(Fact(stmt, key, max(0.0, min(1.0, sal)), f.get("valid_at") or None, action))
     return out

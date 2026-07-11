@@ -36,6 +36,7 @@ from pathlib import Path
 import numpy as np
 
 from . import config
+from .aggregate import aggregate_by_key
 from .consistency import stale_raw_ids
 from .dynamics import Dynamics
 from .index import ResidentIndex
@@ -69,6 +70,13 @@ elif _CONSISTENCY_ENV.replace(".", "", 1).isdigit():
     _CONSISTENCY_THRESHOLD_DEFAULT = float(_CONSISTENCY_ENV)
 else:
     _CONSISTENCY_THRESHOLD_DEFAULT = None
+
+# Read-time recency aggregation (aggregate.py, docs/COMPARISON.md follow-up #1) —
+# an OPTIONAL CAR-style max(serial)-equivalent pool de-conflicting pass, LLM-free
+# (Tenet's `valid_at` already IS the serial-equivalent signal). Default OFF until
+# measured to help; TENET_AGG_READER=1 (or recall(..., agg_reader=True) per call)
+# opts in.
+_AGG_READER_DEFAULT = os.environ.get("TENET_AGG_READER", "").strip().lower() in ("1", "true", "on", "yes")
 
 
 # --- Embedding-based key resolution (TENET_KEY_RESOLUTION) ------------------
@@ -420,6 +428,44 @@ class MemoryCore:
                        created_at=t, last_access=t, pinned=bool(pinned))
         return row_id
 
+    # ---- retraction / tombstone (docs/COMPARISON.md follow-up #3) ------------
+    def retract(self, key: str, *, valid_at: float | None = None) -> int:
+        """Explicit "forget X" — retire every CURRENT fact under `key` WITHOUT
+        replacing it with a new value. Distinct from supersession (store()'s keyed
+        path), which retires-then-REPLACES: a retraction is a pure deletion of the
+        belief, not a value update. Reuses the same bi-temporal machinery
+        (invalid_at/expired_at) supersession does, so the effect on recall is
+        identical in kind — current recall() no longer returns it, `recall(as_of=t)`
+        for t before the retraction still does (history isn't erased, matching
+        every other "retire" path in this store) — but no new row is inserted, so
+        there is no "current value" to report afterward; `uncertain_facts()` and
+        `list_beliefs()` correctly show nothing current for this key post-retraction.
+
+        Returns the number of rows retracted (0 if nothing was current under `key`).
+        Pinned facts ARE retractable (an explicit "forget X" should win over a pin —
+        unlike the forgetting SWEEP, which never touches pinned facts; a user asking
+        to forget something is a stronger, explicit signal than decay)."""
+        t = self._now()
+        va = valid_at if valid_at is not None else t
+        with self._lock:
+            self._ensure_index()
+            rows = self.db.execute(
+                "SELECT id FROM memories WHERE skey=? AND archived=0 AND expired_at IS NULL",
+                (key,),
+            ).fetchall()
+            if not rows:
+                return 0
+            ids = [r["id"] for r in rows]
+            self.db.executemany(
+                "UPDATE memories SET invalid_at=?, expired_at=? WHERE id=?",
+                [(va, t, i) for i in ids],
+            )
+            self.db.commit()
+            self._dyn_dirty = True
+            if self._index is not None:
+                self._index.mark_expired(ids, va, t)
+            return len(ids)
+
     def _key_emb(self, key: str) -> np.ndarray:
         """Embedding of a key's readable ATTRIBUTE slug (subject stripped so the shared
         'user::' prefix doesn't inflate every pair's similarity). Cached per key."""
@@ -488,6 +534,7 @@ class MemoryCore:
         expand: int = 0,
         hops: int = 0,
         consistency_threshold: float | None = _CONSISTENCY_THRESHOLD_DEFAULT,
+        agg_reader: bool = _AGG_READER_DEFAULT,
     ) -> list[Memory]:
         """Most relevant memories, ranked by relevance × decay.
 
@@ -522,6 +569,16 @@ class MemoryCore:
         already know the current value for that key, so a close paraphrase of an old
         one is confirmed-stale, not just embedding-adjacent. Only affects which raw
         slices are eligible; current-fact ranking is byte-identical with this on or off.
+
+        `agg_reader` — OPTIONAL CAR-style read-time recency aggregation
+        (aggregate.py, docs/COMPARISON.md follow-up #1): if the returned pool has
+        more than one memory sharing the same `key`, keep only the highest-`valid_at`
+        member of each group (LLM-free max(serial)-equivalent, since `valid_at` IS
+        the serial-equivalent signal). Default OFF (`_AGG_READER_DEFAULT`,
+        `TENET_AGG_READER=1` to opt in globally). Runs LAST, after expand/hops, so it
+        sees the final pool; a pure filter (drops entries, never reorders/rescopes
+        the ones that survive) — does not touch the annotation-only ranking
+        invariant.
         """
         qv = self._embed(query)  # network call — kept outside the lock
         with self._lock:
@@ -668,7 +725,7 @@ class MemoryCore:
                         pool_vecs.append(np.frombuffer(row["embedding"], dtype=np.float32))
                         taken += 1
                     fresh_rows = [row for row in fresh_rows if row["id"] not in have]
-            return out
+            return aggregate_by_key(out) if agg_reader else out
 
     # ---- adaptive navigation (LLM-free multi-hop) -------------------------
     def navigate(
