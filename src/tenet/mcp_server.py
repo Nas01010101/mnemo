@@ -45,9 +45,10 @@ def recall(query: str, k: int = 5, char_budget: int | None = None) -> str:
     """Retrieve the most relevant memories for a query, ranked by semantic
     relevance weighted by how 'fresh' each memory is. Pass char_budget to cap
     total size when working under a limited context window. Keyed facts carry
-    a learned p_valid (world-model confidence the fact is still current) when
-    available — annotation only, it never changes ranking or which memories
-    are returned; use it to decide whether to hedge or re-confirm a fact."""
+    a learned p_valid (a staleness/confidence hint that the fact is still
+    current) when available — annotation only, it never changes ranking or
+    which memories are returned; use it to decide whether to hedge or
+    re-confirm a fact."""
     hits = _core.recall(query, k=k, char_budget=char_budget)
     if not hits:
         return "(no relevant memories)"
@@ -78,7 +79,7 @@ def navigate(query: str, budget: int = 4) -> str:
 
 @mcp.tool()
 def doubts(threshold: float = 0.5) -> str:
-    """List current keyed facts the learned world model doubts (P(still valid)
+    """List current keyed facts the learned drift model doubts (P(still valid)
     < threshold, from per-key-class survival fitted on this store's own
     supersession history) — worth proactively re-confirming with the user.
     Each row: key, current value, age, p_valid, and the key's typical

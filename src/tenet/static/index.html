@@ -320,12 +320,12 @@
         const txt = document.createElement("span");
         txt.className = "txt";
         txt.textContent = cleanText(b.text, b.key);
-        // World-model doubt marker (annotation only — never hides/reorders a belief):
-        // a faint dotted underline on current facts the learned dynamics model
-        // thinks are likely stale, with p_valid on hover.
+        // Staleness/drift-model doubt marker (annotation only — never hides/reorders
+        // a belief): a faint dotted underline on current facts the learned drift
+        // model thinks are likely stale, with p_valid on hover.
         if (b.status === "current" && typeof b.p_valid === "number" && b.p_valid < 0.6) {
           txt.classList.add("doubt");
-          txt.title = `p_valid=${b.p_valid.toFixed(2)} — the world model doubts this is still current`;
+          txt.title = `p_valid=${b.p_valid.toFixed(2)} — the drift model doubts this is still current`;
         }
         row.appendChild(txt);
         if (b.status === "superseded") {

@@ -290,7 +290,7 @@ def _build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("stats", help="store counts (current/superseded/archived)")
     _add_db(s); s.set_defaults(func=cmd_stats)
 
-    s = sub.add_parser("doubts", help="facts the learned dynamics model doubts (world-model layer)")
+    s = sub.add_parser("doubts", help="facts the learned staleness model doubts (confidence hints)")
     s.add_argument("--threshold", type=float, default=0.5, help="flag facts with P(valid) below this")
     _add_db(s); s.set_defaults(func=cmd_doubts)
 

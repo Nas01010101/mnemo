@@ -1,4 +1,4 @@
-"""Fact dynamics — the world-model layer over the bi-temporal ledger.
+"""Fact dynamics — the drift/staleness model over the bi-temporal belief store.
 
 The ledger is a training set for *how facts change*: every superseded fact is an
 observed lifetime (valid_at -> invalid_at), every current fact a right-censored one.

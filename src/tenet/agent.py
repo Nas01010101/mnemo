@@ -23,10 +23,10 @@ stating it as certain.
 What you remember about the user:
 {memories}{doubts}"""
 
-# World-model layer (dynamics.py) attaches a learned P(still valid) to keyed facts.
-# ANNOTATION ONLY below — never used to filter/reorder recall (measured: rank-demoting
-# doubted facts broke the churn benchmark 100%->33%). We only decide how to *word* a
-# fact that's already been recalled on its normal relevance rank.
+# Fact dynamics (dynamics.py) attaches a learned P(still valid) staleness/confidence
+# hint to keyed facts. ANNOTATION ONLY below — never used to filter/reorder recall
+# (measured: rank-demoting doubted facts broke the churn benchmark 100%->33%). We only
+# decide how to *word* a fact that's already been recalled on its normal relevance rank.
 _CONF_THRESHOLD = 0.6   # below this, caveat the fact in the prompt
 _DOUBT_THRESHOLD = 0.5  # uncertain_facts() cutoff for the session-start doubts line
 _DOUBT_TOP_N = 3
@@ -80,9 +80,10 @@ def _is_pure_question(msg: str) -> bool:
 class MemoryAgent:
     def __init__(self, db_path=None, *, now=time.time):
         self.m = Tenet(db_path, now=now) if db_path else Tenet(now=now)
-        # Anticipatory verification: session-start check of what the world model
-        # doubts, cached once (not recomputed per turn). Empty store/no doubts ->
-        # empty line, no crash (uncertain_facts is pure SQL + closed-form fit).
+        # Anticipatory verification: session-start check of which stored facts the
+        # staleness model doubts, cached once (not recomputed per turn). Empty
+        # store/no doubts -> empty line, no crash (uncertain_facts is pure SQL +
+        # closed-form fit).
         self._doubts_line = _format_doubts_line(self.m.uncertain_facts(threshold=_DOUBT_THRESHOLD))
 
     def respond(self, user_msg: str, *, k: int = 8) -> dict:
