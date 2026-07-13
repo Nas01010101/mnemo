@@ -7,6 +7,7 @@
 
 <p>
   <a href="paper/tenet.pdf"><b>📄 Paper</b></a> ·
+  <a href="paper/extended_abstract.md"><b>Extended abstract</b></a> ·
   <a href="docs/BENCHMARK.md"><b>Benchmarks</b></a> ·
   <a href="docs/COMPARISON.md"><b>vs Mem0 / Zep / Letta</b></a> ·
   <a href="src/tenet/mcp_server.py"><b>MCP server</b></a> ·
@@ -23,6 +24,8 @@
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
 
 *Memory reads shouldn't cost an LLM call.*
+
+**English** · [简体中文](README.zh-CN.md)
 
 ```bash
 pip install tenet-memory   # not yet on PyPI — until it lands, install from source (below)
