@@ -43,6 +43,46 @@ have negatives, `scripts/bench_supersession_firing.py`). **Defaults left unchang
 FIRE-precision/recall F-score (penalize false collapses), so the proxy can't win by over-firing.
 Then re-sweep, then verify on the real firing benchmark before adopting anything.
 
+## Run 2 result (2026-07-13) — judge v2 with negatives: NO threshold wins; a real
+## false-supersession class discovered at the shipped default
+
+Judge v2 (`target.py`, journal `journal.jsonl`; Run 1 rows archived to `journal_run1.jsonl`)
+adds one FALSE-SUPERSESSION NEGATIVE per subject: a `subjN::work_city` fact — embedding-near
+the residence synonyms and sharing the subject token — that must remain CURRENT after the
+residence churn. Objective: `error = 1 − F1(currency-recall, negative-survival)`.
+
+16-eval sweep (6 random + 10 BO) + manual component probes:
+
+| config (ct / tau / floor) | recall | negative-survival | error |
+|---|---:|---:|---:|
+| **0.70 / 0.78 / 0.66 (shipped default)** | 0.333 | **0.000** | 1.000 |
+| 0.55 / 0.65 / 0.50 (Run 1's "winner") | 1.000 | 0.000 | 1.000 |
+| 0.70 / 0.84 / 0.66 | 0.333 | 1.000 | 0.500 |
+| 0.70 / 0.88 / 0.78 | 0.333 | 1.000 | 0.500 |
+
+Three findings, in order of importance:
+1. **Run 1's reward-hack is confirmed quantitatively**: its tau=0.66 "winner" has perfect
+   recall and ZERO negative survival — the hack traded silent false supersessions for recall,
+   invisible to a positives-only metric.
+2. **The shipped default (tau 0.78) has a real, previously-unmeasured false-supersession
+   class**: semantically-adjacent distinct attributes (`work_city` vs `city`/`home_city`).
+   The 2026-07-10 firing-set negatives were shared-WORD probes; embedding-NEAR distinct
+   attributes were not covered, and they fire falsely at 0.78.
+3. **No threshold in the box separates the classes** (best F1 = 0.5 across the entire sweep;
+   flat plateau). The slug-cosine of `work_city`↔`city` (must NOT collapse) overlaps the
+   synonym pairs `home_city`↔`city` (MUST collapse). A token-structure rule can't separate
+   them either — `work_city` vs `city` and `home_city` vs `city` are structurally identical
+   (strict token superset + one non-sub-attr extra token); only the semantics of the extra
+   token ("work" vs "home") differs. Threshold tuning is structurally insufficient here.
+
+**Decision: defaults unchanged** (raising tau to 0.84 would fix the negatives on this proxy
+but forfeits the synonym-drift recall that key-resolution exists to provide — and the
+PersonaMem +2.9pp win was measured at 0.78). The false-fire class is real but narrow
+(same-subject attributes that are embedding-adjacent AND text-adjacent); candidate real fix
+is a conditional stricter text-floor when the key-token sets are in a strict-superset
+relation with a non-meta extra token — needs the labeled firing benchmark (fresh distillation;
+RTX) + PersonaMem regression gates before touching `_value_compatible`. Filed as follow-up.
+
 ## Run
 ```
 AUTORESEARCH_MAXIMIZE=0 python ~/code/claude-config/scripts/autoresearch/sweep.py experiments/autoresearch_thresholds

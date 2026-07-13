@@ -277,7 +277,7 @@ def _job(job):
     """One reader call. job = (arm, qi, kwargs-for-that-arm)."""
     arm, qi, question, gold, ctx_or_pool = job
     try:
-        pred = (answer_natural(ctx_or_pool, question) if arm in ("rag", "tenet")
+        pred = (answer_natural(ctx_or_pool, question) if arm in ("rag", "tenet", "tenet_consolidate")
                 else answer_extract_serial_churn(ctx_or_pool, question))
     except config.ProviderError:
         raise
@@ -299,8 +299,27 @@ def run_dataset(ds: dict, arms: list[str], k: int, cache_dir: Path, host_embedde
     line_vecs = _embed_lines(cache_dir, cache_id, texts, host_embedder)
 
     m_tenet = None
-    if "tenet" in arms:
+    if "tenet" in arms or "tenet_consolidate" in arms:
         m_tenet = build_tenet_db(cache_dir, cache_id, ds["sessions"])
+    m_tenetc = None
+    if "tenet_consolidate" in arms:
+        # TENET_CONSOLIDATE arm: same cached store, consolidation applied via the
+        # retroactive sweep — provably equivalent to write-time consolidation on a
+        # chronologically-ingested ledger (memory.py consolidate_sweep docstring),
+        # so the two arms share ingestion byte-for-byte and differ ONLY in the
+        # post-supersession raw-echo archival.
+        import sqlite3
+        dbc = cache_dir / f"{cache_id}.tenetc.db"
+        if not dbc.exists():
+            # sqlite backup API, NOT a file copy: the live store is WAL-mode, so the
+            # bare .db file on disk may be empty until a checkpoint — backup() snapshots
+            # the full logical database from the open connection.
+            dst = sqlite3.connect(dbc)
+            m_tenet.core.db.backup(dst)
+            dst.close()
+        clock_c = [1_000_000.0 + 3600 * (len(ds["sessions"]) + 1)]
+        m_tenetc = Tenet(dbc, now=lambda: clock_c[0])
+        m_tenetc.core.consolidate_sweep()
     ing_mem0 = ing_hippo = None
     # bb.BCACHE is set ONCE per U-value by the caller (main()), not per-call here — it's
     # constant for the whole U-value's processing, so this function is safe to call
@@ -327,6 +346,10 @@ def run_dataset(ds: dict, arms: list[str], k: int, cache_dir: Path, host_embedde
             hits = m_tenet.core.recall(question, k=k, consistency_threshold=consistency_threshold)
             ctx = format_tenet_context(hits, m_tenet.core._now(), currency=currency_context)
             jobs.append(("tenet", qi, question, gold, ctx))
+        if "tenet_consolidate" in arms:
+            hits = m_tenetc.core.recall(question, k=k, consistency_threshold=consistency_threshold)
+            ctx = format_tenet_context(hits, m_tenetc.core._now(), currency=currency_context)
+            jobs.append(("tenet_consolidate", qi, question, gold, ctx))
         if "mem0" in arms:
             mems, mvecs = ing_mem0
             top = np.argsort(-(mvecs @ qv))[:k] if len(mems) else []
@@ -353,6 +376,8 @@ def run_dataset(ds: dict, arms: list[str], k: int, cache_dir: Path, host_embedde
                                "config": ds["config"]})
     if m_tenet is not None:
         m_tenet.close()
+    if m_tenetc is not None:
+        m_tenetc.close()
     return results, misses
 
 
