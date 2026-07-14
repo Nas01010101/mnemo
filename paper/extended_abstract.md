@@ -76,10 +76,12 @@ the best accuracy-per-token frontier (49.2 acc/1k tok at half of RAG's context, 
 
 **Knowledge churn**: 100% at every update level on the templated primitive (RAG: 50% at
 U=12). On the harsher paraphrased **ChurnBench** our own pre-registered claim was
-*falsified* (worst of four arms) — then recovered to **98 / 92 / 82** at U=2/8/32 by a
-key-scoped read-time consistency rule plus currency-structured context (both now
-default-on, all regression gates green); Mem0-style delete-outright consolidation still
-leads at extreme churn (flat 100 at U=32). Reported in full.
+*falsified* (worst of four arms) — then recovered: with key-resolution + read-time
+consistency + currency-context (all default-on) the stack reaches **half-life 32** (98–100%
+through U=32 on the Qwen stack), matching Mem0-style delete-outright consolidation *while
+keeping belief history*. We ported that delete-outright trick into Tenet (`TENET_CONSOLIDATE`)
+and measured it a **no-benefit** — it ties or marginally trails the default, so it ships
+default-OFF (a fourth measured-negative flag). Reported in full.
 
 **Local write path**: a LoRA-tuned Qwen2.5-1.5B distiller runs the full
 learn→supersede→doubt loop with zero cloud calls — 6/6 clean-churn supersessions, 0.0

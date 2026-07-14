@@ -320,8 +320,11 @@ Tenet is a **frontier, not a point** — one `expand` knob trades tokens for acc
   `bench_horizon`) Tenet holds 100% at every update level while RAG collapses to 50% — the
   collapse holds under a gpt-4o reader, so it's *structural*, not reader weakness. On the
   harsher *paraphrased* [ChurnBench](docs/BENCHMARK.md#9-churnbench--parametric-high-churn-stress-test-measured-2026-07-10)
-  (§9), read-time consistency (now default-on) lifts Tenet from worst-arm to **98/92/82** at
-  U=2/8/32, with Mem0-style delete-outright consolidation still leading at extreme churn.
+  (§9), the default stack (read-time consistency + key-resolution + currency-context) reaches
+  **half-life 32** (98–100% through U=32 on the Qwen stack) — matching Mem0-style delete-outright
+  consolidation *while keeping belief history*. We even ported that delete-outright trick into
+  Tenet (`TENET_CONSOLIDATE`) and measured it as a **no-benefit** (ties/marginally trails the
+  default — [§9.2](docs/BENCHMARK.md#92-write-time-consolidation-tenet_consolidate--a-measured-negative-measured-2026-07-14)); it ships default-OFF.
 - **Ablation:** the belief–evidence consistency rule alone lifts current-value accuracy 55%→100%.
 - **Honest:** the one category still behind RAG is multi-session synthesis (42.9 vs 57.1, up
   from 28.6). We report it. *(Eval off-Qwen, one seed, reader noise ≈±5–7pp; shipped system uses Qwen Cloud.)*

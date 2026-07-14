@@ -559,6 +559,40 @@ Reproduce: `python scripts/bench_churn_fix_ab.py --updates 2,8,32 --principals 1
 Artifacts: `docs/churnbench_threshold_sweep.json`, `docs/churnbench_fix_ab.json`,
 `docs/churnbench_fix_ab_misses.jsonl`.
 
+### 9.2 Write-time consolidation (`TENET_CONSOLIDATE`) — a measured-negative (measured 2026-07-14)
+
+The one arm that stayed flat at extreme churn in §9/§14 is **Mem0-style**, which
+*deletes* superseded memories outright so no stale copy can leak. We ported that exact
+mechanism into Tenet as an opt-in flag — `TENET_CONSOLIDATE=1`: at supersession, hard-archive
+the current raw slices that echo the retired value (cosine ≥ `TENET_CONSOLIDATE_TAU`,
+default 0.60, scoped to the retired fact), leaving the ledger rows for audit but dropping
+them from all recall including `as_of`. The question: does porting Mem0's delete-outright
+trick beat Tenet's default read-time machinery at U=32?
+
+**It doesn't.** On the shipped Qwen stack (`qwen3.6-flash` distill + `qwen3.7-plus` read +
+local bge-small, seed 1, n=50/point, fresh distillation), paired against the default arm in
+the same harness:
+
+| U | TENET (default) | TENET + consolidate |
+|---:|---:|---:|
+| 2  | **100.0** [92.9, 100.0] | **100.0** [92.9, 100.0] |
+| 8  | **100.0** [92.9, 100.0] | 98.0 [89.5, 99.6] |
+| 32 | 98.0 [89.5, 99.6] | 98.0 [89.5, 99.6] |
+
+Consolidation **ties or marginally trails** the default (98 vs 100 at U=8; both CIs overlap
+fully) — hard-archiving raw echoes removes verbatim detail the reader still uses, and the
+default stack (key-resolution + read-time consistency §9.1 + currency-context) already holds
+half-life 32 without deleting history. So the flag **ships default-OFF**, joining the honest
+ledger of measured-negative flags (`TENET_RAW_RECALL`, `TENET_AGG_READER`, `TENET_RETRACT`).
+Net: Tenet reaches Mem0-style's extreme-churn robustness **while keeping the belief history
+and time-travel that delete-outright throws away** — the delete is not what earns the number.
+(Default arm here = 98 at U=32, consistent with §14's 100/100/100 within CI; the residual
+gap to a literal flat 100 is reader stochasticity at n=50, not a mechanism deficit.)
+
+Reproduce: `LLM_PROVIDER=qwen EMBED_PROVIDER=local python scripts/bench_churn.py --updates
+2,8,32 --principals 10 --arms tenet,tenet_consolidate --consistency-threshold 0.70
+--currency-context`. Tests: `scripts/test_consolidate.py` (18 deterministic checks, no LLM).
+
 ## 10. Local distiller (zero-cloud) verdict
 
 **Measured 2026-07-10.** Every result above runs `ingest()`'s fact-distillation on Qwen Cloud. This section asks a
