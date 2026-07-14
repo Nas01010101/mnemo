@@ -3,6 +3,7 @@
 **Anas** · Global AI Hackathon with Qwen Cloud (Track 1) · 2026
 
 > **Code:** https://github.com/Nas01010101/tenet   **License:** MIT
+> **Extended abstract:** [`paper/extended_abstract.md`](extended_abstract.md) / [PDF](extended_abstract.pdf)
 
 ---
 

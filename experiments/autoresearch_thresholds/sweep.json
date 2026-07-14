@@ -1,0 +1,14 @@
+{
+  "target": "target.py",
+  "maximize": false,
+  "n_init": 6,
+  "n_iters": 10,
+  "seed": 0,
+  "acq": "ei",
+  "candidate_pool": 256,
+  "params": [
+    {"name": "consistency_threshold", "type": "float", "low": 0.55, "high": 0.85},
+    {"name": "tau_key",               "type": "float", "low": 0.65, "high": 0.88},
+    {"name": "text_floor",            "type": "float", "low": 0.50, "high": 0.78}
+  ]
+}

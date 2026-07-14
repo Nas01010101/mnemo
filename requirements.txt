@@ -1,8 +1,15 @@
+# Floors raised 2026-07-12 so the minimum-resolvable dependency set is CVE-clean
+# (osv-scanner flagged the old floors' minimum versions, not what fresh installs get).
 openai>=1.40
 numpy>=1.26
 fastapi>=0.110
 uvicorn>=0.27
-mcp>=1.2
+mcp>=1.23
 oss2>=2.18          # Alibaba Cloud Object Storage (memory snapshots / proof-of-deploy)
+requests>=2.32.4    # floor transitive deps above known CVEs
+python-multipart>=0.0.31
+idna>=3.15
+pycryptodome>=3.23
+tqdm>=4.66.3
 # Optional — only for off-Qwen validation (EMBED_PROVIDER=local):
 # sentence-transformers>=3.0

@@ -103,7 +103,10 @@ class NeuralDynamics:
     # ---- load ----
     @classmethod
     def load(cls, path: str | Path) -> "NeuralDynamics":
-        d = np.load(path, allow_pickle=True)
+        # Opt-in path (TENET_DYNAMICS=neural) loading a LOCAL, user-supplied trained
+        # artifact; the npz stores object arrays (kclasses/sources/config) so pickle is
+        # required. Never loads from the network.
+        d = np.load(path, allow_pickle=True)  # nosemgrep: trailofbits.python.pickles-in-numpy.pickles-in-numpy
         cfg = json.loads(str(d["config"]))
         W = {k: d[k] for k in d.files if k not in ("kclasses", "sources", "config")}
         return cls(W, cfg, list(d["kclasses"]), list(d["sources"]))

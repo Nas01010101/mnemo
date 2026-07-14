@@ -92,7 +92,9 @@ class ResidentIndex:
     # ---- construction / refresh -------------------------------------------
     @classmethod
     def build(cls, db, d: int) -> "ResidentIndex":
-        rows = db.execute(f"SELECT {_ROW_COLUMNS} FROM memories WHERE archived=0").fetchall()
+        # _ROW_COLUMNS is a module-level constant (never user input); all user-supplied
+        # values in this codebase go through parameterized queries.
+        rows = db.execute(f"SELECT {_ROW_COLUMNS} FROM memories WHERE archived=0").fetchall()  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
         idx = cls(d, capacity=max(len(rows), 256))
         for row in rows:
             idx._append_row(row)

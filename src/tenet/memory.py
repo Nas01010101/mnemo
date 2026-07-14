@@ -92,6 +92,25 @@ _AGG_READER_DEFAULT = os.environ.get("TENET_AGG_READER", "").strip().lower() in 
 # comes from — only how many raw-vs-fact slots the fixed k budget allocates.
 _RAW_RECALL_DEFAULT = os.environ.get("TENET_RAW_RECALL", "").strip().lower() in ("1", "true", "on", "yes")
 
+# Write-time consolidation (ChurnBench §9 follow-up) — an OPTIONAL Mem0-parity
+# knob for EXTREME churn: when a keyed fact is superseded, ALSO archive current
+# raw slices that echo the superseded value (cosine >= _TAU_CONSOLIDATE against
+# the retired fact's embedding). The check is inherently key-scoped — we compare
+# only against the specific fact being retired — so the threshold can sit well
+# below the global _STALE_ECHO (0.80) and the read-time consistency rule (0.70)
+# without a cross-key false-positive surface. Trade-off, stated plainly: archived
+# raws leave ALL recall including `as_of` time-travel (rows stay in the sqlite
+# ledger for audit; the belief layer keeps full bi-temporality either way), and
+# verbatim detail near a churned value is sacrificed — exactly the trade
+# Mem0-style delete-outright consolidation makes to stay flat at U=32. Default
+# OFF; TENET_CONSOLIDATE=1 (or store(..., consolidate=True) per call) opts in.
+# Read at call time (not import time) so tests/benchmarks can flip it per-store.
+_TAU_CONSOLIDATE = float(os.environ.get("TENET_CONSOLIDATE_TAU", "0.60"))
+
+
+def _consolidate_default() -> bool:
+    return os.environ.get("TENET_CONSOLIDATE", "").strip().lower() in ("1", "true", "on", "yes")
+
 
 # --- Embedding-based key resolution (TENET_KEY_RESOLUTION) ------------------
 # The per-message distiller keys the SAME real-world attribute inconsistently
@@ -292,6 +311,7 @@ class MemoryCore:
         supersede: float = 0.90,
         dedup: float = 0.985,
         surprise_gate: float | None = None,
+        consolidate: bool | None = None,
         _vec: np.ndarray | None = None,
     ) -> int:
         """Add a memory.
@@ -312,7 +332,7 @@ class MemoryCore:
             row_id = self._store_locked(
                 text, key=key, kind=kind, source=source, pinned=pinned, salience=salience,
                 valid_at=valid_at, supersede=supersede, dedup=dedup,
-                surprise_gate=surprise_gate, vec=vec,
+                surprise_gate=surprise_gate, consolidate=consolidate, vec=vec,
             )
             self.db.commit()
             self._dyn_dirty = True  # ledger changed -> refit dynamics lazily
@@ -355,14 +375,16 @@ class MemoryCore:
                     source=it.get("source"), pinned=it.get("pinned", False),
                     salience=it.get("salience", 0.5), valid_at=it.get("valid_at"),
                     supersede=it.get("supersede", 0.90), dedup=it.get("dedup", 0.985),
-                    surprise_gate=it.get("surprise_gate"), vec=it["_vec"],
+                    surprise_gate=it.get("surprise_gate"),
+                    consolidate=it.get("consolidate"), vec=it["_vec"],
                 ))
             self.db.commit()
             self._dyn_dirty = True
         return ids
 
     def _store_locked(self, text: str, *, key, kind, source, pinned, salience,
-                       valid_at, supersede, dedup, surprise_gate, vec: np.ndarray) -> int:
+                       valid_at, supersede, dedup, surprise_gate, vec: np.ndarray,
+                       consolidate: bool | None = None) -> int:
         """Everything store()/store_many() do per item EXCEPT acquiring the lock and
         committing — so store_many() can run many of these in one transaction.
         Caller MUST hold self._lock. Mirrors every DB mutation into the resident
@@ -418,6 +440,10 @@ class MemoryCore:
                 salience = max(salience, s2)
                 if ids2 and idx is not None:
                     idx.mark_expired(ids2, va, t)
+                superseded_ids.extend(ids2)
+            do_consolidate = _consolidate_default() if consolidate is None else consolidate
+            if do_consolidate and superseded_ids:
+                self._consolidate_raw_echoes(superseded_ids)
         else:
             hit = self._nearest_current(vec)  # (id, sim, text)
             if hit and hit[1] >= dedup:
@@ -441,6 +467,62 @@ class MemoryCore:
                        embedding=vec, salience=float(salience), valid_at=va,
                        created_at=t, last_access=t, pinned=bool(pinned))
         return row_id
+
+    def _consolidate_raw_echoes(self, superseded_ids: list[int]) -> int:
+        """Write-time consolidation (TENET_CONSOLIDATE): archive current raw slices
+        that echo a fact just retired by supersession — cosine >= _TAU_CONSOLIDATE
+        against the retired fact's own embedding, so the comparison is scoped to
+        the exact value being replaced. Caller MUST hold self._lock and be inside
+        the same transaction (commit happens in store()/store_many()). Archived
+        rows stay in the sqlite ledger but leave the resident index — and with it
+        every recall path, `as_of` included (same semantics as the forget sweep).
+        Returns the number of raw slices archived."""
+        idx = self._index
+        if idx is None or not idx.size:
+            return 0
+        # Placeholder-count interpolation only; values are bound parameters.
+        sup_rows = self.db.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+            f"SELECT embedding FROM memories WHERE id IN ({','.join('?' * len(superseded_ids))})",
+            superseded_ids,
+        ).fetchall()
+        if not sup_rows:
+            return 0
+        sup_mat = np.array([np.frombuffer(r["embedding"], dtype=np.float32) for r in sup_rows])
+        mask = idx.mask_raw_current()
+        if not mask.any():
+            return 0
+        raw_rows, raw_mat = idx.rows_and_matrix_for_mask(mask)
+        sims = raw_mat @ sup_mat.T                      # (n_raw, n_superseded)
+        hit_ids = [r["id"] for r, s in zip(raw_rows, sims) if float(s.max()) >= _TAU_CONSOLIDATE]
+        if not hit_ids:
+            return 0
+        self.db.executemany("UPDATE memories SET archived=1 WHERE id=?",
+                            [(i,) for i in hit_ids])
+        idx.remove(hit_ids)
+        return len(hit_ids)
+
+    def consolidate_sweep(self) -> int:
+        """Retroactive consolidation: apply TENET_CONSOLIDATE semantics to an
+        EXISTING store — archive every current raw slice echoing ANY superseded
+        keyed fact (cosine >= _TAU_CONSOLIDATE). For a chronologically-ingested
+        ledger this is equivalent to having had the write-time flag on all along
+        (a raw echoing value_i is always stored before value_i is superseded), so
+        flipping the flag on a mature store doesn't leave historical echoes
+        behind. Returns the number of raw slices archived."""
+        with self._lock:
+            self._ensure_index()
+            idx = self._index
+            if idx is None or not idx.size:
+                return 0
+            expired = self.db.execute(
+                "SELECT id FROM memories WHERE skey IS NOT NULL AND kind='fact' "
+                "AND archived=0 AND expired_at IS NOT NULL"
+            ).fetchall()
+            if not expired:
+                return 0
+            n = self._consolidate_raw_echoes([r["id"] for r in expired])
+            self.db.commit()
+            return n
 
     # ---- retraction / tombstone (docs/COMPARISON.md follow-up #3) ------------
     def retract(self, key: str, *, valid_at: float | None = None) -> int:
