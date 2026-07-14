@@ -37,7 +37,6 @@ def snapshot(db_path: str | Path, object_key: str = "tenet/snapshot.db") -> str:
 def restore(db_path: str | Path, object_key: str = "tenet/snapshot.db") -> bool:
     """Download the latest memory DB snapshot from OSS if it exists."""
     b = _bucket()
-    import oss2
     if not b.object_exists(object_key):
         return False
     b.get_object_to_file(object_key, str(db_path))

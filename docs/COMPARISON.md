@@ -13,6 +13,29 @@ only ~57%**, far below their 90%+ pipelines. The gap is embedder/harness, **not*
 design. We therefore compare Tenet only to **our own RAG under identical settings**, and on
 **architecture/capabilities**; we do **not** claim an accuracy win over these systems.
 
+## ⚠️ Frontier reality check — the 2026 reproduction crisis (verified 2026-07-14)
+The 90%+ vendor numbers in the LongMemEval row below are **self-reported and do not
+survive independent reproduction.** Two independent harnesses (Maximem, Bench'd, 2026)
+found:
+- **Mem0** claims **93.4%** LongMemEval; reproduces at **73.8% hosted / 32.4% OSS** — a
+  20–60-point gap.
+- **LoCoMo**'s answer key is **6.4% wrong** and its LLM judge **accepts up to 63% of
+  deliberately incorrect answers** — so LoCoMo scores are structurally unreliable.
+- A **no-memory** `gpt-4o-mini` baseline scores **57.6%** — several "memory systems" barely
+  clear it.
+- Honest, reproduced frontier: **Engram 83.6** (official category judge, bi-temporal +
+  facts-plus-raw, arXiv:2606.09900), AutoMem 87, Supermemory 81.6.
+
+**This is Tenet's positioning, not a footnote.** In a field where the headline number is
+routinely inflated 20–60 points, Tenet reports **every** result with Wilson 95% CIs, ships
+**four default-OFF flags that we measured as negative** (`RAW_RECALL`, `AGG_READER`,
+`RETRACT`, `CONSOLIDATE`), and **falsified its own pre-registered churn claim in public**
+(§4.8) before fixing it. We do not claim a cross-protocol LongMemEval win; we claim
+**standardized, apples-to-apples wins** (MemoryAgentBench FactConsolidation **86.5 SH**,
+official SubEM + prompt, *above* the published mini-tier SOTA 78.0; MAB-AR **59.3**, 2nd of
+all published systems) plus a real head-to-head where we control every variable (§A). The
+brand is: **the memory system whose numbers you can actually reproduce.**
+
 ## Feature / capability matrix
 | | **Tenet** | Mem0 | Zep / Graphiti | Letta (MemGPT) | Mastra OM | agentmemory |
 |---|---|---|---|---|---|---|
