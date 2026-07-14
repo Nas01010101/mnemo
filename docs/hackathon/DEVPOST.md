@@ -114,6 +114,14 @@ rose from <2 to 8 — reported as a partial, honest fix (still short of a flat-3
 half-life), not a full close of the gap (`docs/BENCHMARK.md` §9–9.1).
 
 ## Accomplishments that we're proud of
+- **Numbers you can actually reproduce — in a field where that's rare.** Independent 2026
+  audits (Maximem, Bench'd) found the headline agent-memory scores don't survive
+  reproduction: Mem0 claims 93.4% on LongMemEval but reproduces at **73.8% hosted / 32.4%
+  OSS**, and LoCoMo's own answer key is 6.4% wrong with a judge that accepts up to 63% of
+  wrong answers. Tenet is built the opposite way: **every number carries a Wilson 95% CI**,
+  we **ship four flags default-OFF because we measured them as no-benefit** (`RAW_RECALL`,
+  `AGG_READER`, `RETRACT`, `CONSOLIDATE`), and we **publicly falsified our own pre-registered
+  churn claim** before fixing it. Every result reproduces from one command.
 - **Beats published SOTA on the standardized benchmark.** MemoryAgentBench (ICLR 2026)
   FactConsolidation single-hop: **86.5%** [82.8, 89.5], above the published mini-tier SOTA
   of 78.0 — on a *weaker* local-7B backbone with zero-LLM, deterministic ingestion; ties
@@ -154,9 +162,12 @@ half-life), not a full close of the gap (`docs/BENCHMARK.md` §9–9.1).
 - **Wider-N validation of the local LoRA distiller** — current numbers are a small,
   deterministic probe (n=26 messages / 8 churn groups), directionally strong but not yet
   a production SLA.
-- **A confirmatory, larger multi-hop-decomposition run** if a different lever (not query
-  decomposition) is found to move the reader-reasoning bottleneck identified in the
-  pre-registered null above.
+- **A learned graph traversal for multi-hop chaining.** We tried the cheap read-time levers
+  for the RULER multi-hop loss and both were measured negatives — BM25+dense RRF ties baseline
+  gold-in-pool exactly, and Self-Ask query decomposition *hurts* on a strong reader (error
+  propagation). The gap is genuine graph-traversal territory (HippoRAG-style PPR), a different
+  architecture — and, notably, mostly a weak-reader artifact: on the shipped `qwen3.7-plus`
+  reader baseline RULER-MH is already ~60.6%, CI-overlapping the graph leader's 66.
 
 ## Built with
 Qwen Cloud (`qwen3.7-plus`, `qwen3.6-flash`, `text-embedding-v4`) · Model Context
