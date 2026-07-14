@@ -480,8 +480,9 @@ class MemoryCore:
         idx = self._index
         if idx is None or not idx.size:
             return 0
-        sup_rows = self.db.execute(
-            f"SELECT embedding FROM memories WHERE id IN ({','.join('?' * len(superseded_ids))})",  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+        # Placeholder-count interpolation only; values are bound parameters.
+        sup_rows = self.db.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+            f"SELECT embedding FROM memories WHERE id IN ({','.join('?' * len(superseded_ids))})",
             superseded_ids,
         ).fetchall()
         if not sup_rows:
