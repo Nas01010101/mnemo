@@ -62,7 +62,6 @@ def mem0_search(m, q, uid, k):
 
 
 def run(principals: int, k: int):
-    m0 = make_mem0()
     arms = ("rag", "tenet", "mem0")
     ok = {a: [] for a in arms}       # per-question correctness (current value)
     leak = {a: [] for a in arms}     # per-question stale-leak
@@ -74,6 +73,11 @@ def run(principals: int, k: int):
         sessions, gold = build_history(p)
         turns = [t["content"] for s in sessions for t in s]
         uid = f"p{p}"
+
+        # FRESH mem0 store per principal (isolated, like Tenet's fresh DB) — a shared
+        # collection makes mem0's per-add dedup scan a growing store and slow to a crawl,
+        # and would leak facts across principals. One user, one clean store.
+        m0 = make_mem0()
 
         # RAG store (raw turns + local embeds)
         host = Tenet(Path(tempfile.mkdtemp()) / "h.db")

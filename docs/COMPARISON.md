@@ -121,6 +121,45 @@ at write*, Tenet resolves supersession at distill time and reads with pure vecto
 RAG and HippoRAG-v2 collapse at U=32 because the top-k physically fills with stale versions —
 a failure no reader strength or graph can fix.
 
+> **"Mem0-style" above is an *idealized* reimpl, and it flatters Mem0.** That arm *deletes*
+> superseded memories outright, so nothing stale can leak — flat 100. **The real `mem0ai`
+> package does not behave that way** (§A.2): its LLM consolidation frequently *keeps* the old
+> value alongside the new, so it leaks stale answers where the idealized arm wouldn't. We
+> report both, and we do **not** claim Tenet beats the idealized delete-arm on raw churn
+> accuracy — it ties it while keeping history the delete-arm throws away.
+
+### A.2 Real `mem0ai` package — live head-to-head (measured 2026-07-14) · reader qwen3.7-plus, n=30
+
+Not the reimpl above — the **actual `mem0ai` 2.0.12 package**, add()/search() per its own API,
+given the **stronger `qwen3.7-plus` as its extraction/consolidation LLM** (Tenet only gets
+`qwen3.6-flash` for distillation — deliberately generous to Mem0), same bge-small embedder, same
+churn history, same reader + scorer as every arm. Ask the CURRENT value after a distractor-laden
+update history:
+
+| arm | current-value acc | stale-leak | reads |
+|---|---:|---:|---|
+| **Tenet** | **100.0** [88.6, 100.0] | **0.0%** | LLM-free |
+| naive-RAG | 100.0 [88.6, 100.0] | 0.0% | LLM-free |
+| **real `mem0ai`** | **73.3** [55.6, 85.8] | **26.7%** | LLM per add |
+
+**McNemar Tenet-vs-Mem0: 8–0, p=0.0078** — Tenet strictly dominates (wins 8, loses 0). The
+real package answers with a *superseded* value more than a quarter of the time; Tenet never
+does. Representative misses (`scratchpad/mem0_h2h_misses.jsonl`), each the current value asked
+after the user updated it:
+
+| question | correct (latest) | **Tenet** | **real Mem0** |
+|---|---|---|---|
+| where do you live? | Seattle | Seattle ✅ | **Boston** ❌ (old) |
+| what's your job title? | junior analyst | junior analyst ✅ | **team lead** ❌ (old) |
+| what car do you drive? | Honda Civic | Honda Civic ✅ | **Tesla Model 3** ❌ (old) |
+| which gym? | CrossFit Central | CrossFit Central ✅ | **Equinox** ❌ (old) |
+
+**This is the honest churn win — against the real competitor, not a strawman.** Note naive-RAG
+*also* scores 100% here (the latest turn is retrievable at k=8), so this is **not** a
+retrieval-baseline strawman: it's specifically Mem0's LLM consolidation *keeping* stale copies,
+the exact failure a deterministic bi-temporal ledger avoids. Reproduce: `LLM_PROVIDER=qwen
+EMBED_PROVIDER=local <mem0-venv>/bin/python scripts/bench_mem0_h2h.py --principals 6`.
+
 ### B. MAB FactConsolidation — supersession under counterfactual updates · matched 7B, n=200 pooled
 (qwen2.5:7b backbone for ALL arms — the matched-method table; SubEM, official prompt.)
 
