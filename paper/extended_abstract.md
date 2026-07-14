@@ -74,12 +74,15 @@ Gemini-3.5-flash: 75.0 vs 70.0). Retrieval is saturated (recall@10 = 97.5–100%
 absolute accuracy tracks reader strength; under a frozen weak reader Tenet still traces
 the best accuracy-per-token frontier (49.2 acc/1k tok at half of RAG's context, 1.6×).
 
-**Knowledge churn**: 100% at every update level on the templated primitive (RAG: 50% at
-U=12). On the harsher paraphrased **ChurnBench** our own pre-registered claim was
-*falsified* (worst of four arms) — then recovered to **98 / 92 / 82** at U=2/8/32 by a
-key-scoped read-time consistency rule plus currency-structured context (both now
-default-on, all regression gates green); Mem0-style delete-outright consolidation still
-leads at extreme churn (flat 100 at U=32). Reported in full.
+**Knowledge churn (reported without a strawman)**: on the single-attribute primitive Tenet
+holds 100% vs RAG's 50% — but that primitive is pre-registered to favor Tenet, so we also run
+the harder multi-fact **ChurnBench**, where our own claim was *falsified* then recovered to
+**half-life 32** (~82% at U=32). We state the loss plainly: an *idealized* delete-outright
+Mem0-style arm stays flat 100 there — **Tenet does not beat it on raw churn accuracy.** Tenet's
+real edge over Mem0 is that (a) the *real* `mem0ai` package doesn't delete-outright — it
+accumulates stale copies and loses a live head-to-head — and (b) Tenet keeps a queryable belief
+history + time-travel that delete-outright discards. Porting delete-outright into Tenet
+(`TENET_CONSOLIDATE`) was a measured **no-benefit** (default-OFF, a fourth measured-negative).
 
 **Local write path**: a LoRA-tuned Qwen2.5-1.5B distiller runs the full
 learn→supersede→doubt loop with zero cloud calls — 6/6 clean-churn supersessions, 0.0

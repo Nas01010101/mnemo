@@ -401,14 +401,23 @@ def main() -> int:
     ap.add_argument("--principal-workers", type=int, default=4,
                     help="how many principals' datasets to build+read concurrently "
                          "(total in-flight API calls ~= this * --workers)")
-    ap.add_argument("--consistency-threshold", type=float, default=None,
-                    help="tenet arm only: component 1 of the §9 fix (consistency.py). "
-                         "None (default) = off, matching the §9-measured baseline.")
+    ap.add_argument("--consistency-threshold", type=float, default=0.70,
+                    help="tenet arm only: read-time belief-evidence consistency (§9.1, "
+                         "consistency.py). Default 0.70 MATCHES the shipped recall() default "
+                         "(src/tenet/memory.py) so a plain rerun reflects the product, not "
+                         "the pre-fix baseline. Pass --no-consistency to reproduce the §9 "
+                         "falsification (consistency OFF).")
+    ap.add_argument("--no-consistency", action="store_true",
+                    help="turn read-time consistency OFF (threshold=None) — reproduces the "
+                         "original §9 falsification table (tenet half-life <2).")
     ap.add_argument("--currency-context", action="store_true",
                     help="tenet arm only: component 2 of the §9 fix — structure the "
                          "reader context as 'Current beliefs:' / 'Supporting raw "
-                         "context:' instead of a flat unordered list.")
+                         "context:' instead of a flat unordered list (product-faithful; "
+                         "the §9.1/§A 'fully-fixed' numbers use this + consistency).")
     args = ap.parse_args()
+    if args.no_consistency:
+        args.consistency_threshold = None
 
     sweep = [int(x) for x in args.updates.split(",")]
     arms = [a.strip() for a in args.arms.split(",") if a.strip()]

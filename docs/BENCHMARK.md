@@ -17,10 +17,14 @@ claim it licenses (with an adversarial defect list + severities).
 - **A frontier, not a point** (one `expand` knob): the **efficiency** point gives the
   **best accuracy-per-token** (49.2, 1.6× RAG) at *half* the context; the **parity** point
   **matches strong RAG's one-shot accuracy at equal-or-lower tokens** (57.5% = 57.5%, gpt-4o).
-- **Dominates the long-horizon regime on the templated primitive**: as a fact is updated
-  many times, RAG collapses (100%→50%) while Tenet holds 100% there; on the harsher
-  paraphrased ChurnBench (§9) the fixed system measures 98/92/82 at U=2/8/32. This is
-  the regime long-term memory is *for*.
+- **The long-horizon churn regime, reported without a strawman**: on the templated primitive
+  (pre-registered to favor Tenet) RAG collapses 100%→50% while Tenet holds 100%. On the harder
+  paraphrased ChurnBench (§9), the honest picture: read-time fixes lift Tenet's churn half-life
+  from <2 to **32** (U=32 accuracy **~82–100% across runs** — see §9.1 for the run-to-run
+  spread). An *idealized* delete-outright Mem0-style arm holds flat 100 there, so **Tenet ties
+  it but does not beat it on raw churn accuracy — we say so.** Tenet's real churn win is against
+  the **actual `mem0ai` package** (which accumulates stale copies, unlike that idealized arm):
+  100% vs 73.3%, p=0.0078 (COMPARISON §A.2). This is the regime long-term memory is *for*.
 - **Honest weakness**: multi-session synthesis — the one category still behind RAG
   (42.9 vs 57.1, up from 28.6). Documented in §8.
 
@@ -319,7 +323,17 @@ frameworks: Mem0 32.6, Zep 37.5, MemGPT ≈39.
   (both arms identical), not retrieval-bound.
 - **RULER MH-QA is the honest loss** (45 vs 66): HippoRAG-v2's Personalized-PageRank
   graph is genuinely better at multi-hop chaining over narrative documents. Reported,
-  not hidden.
+  not hidden. **Two 2026-07 follow-ups (both null/negative, both reported):** (a) BM25+dense
+  **RRF** at the retrieval stage ties baseline gold-in-pool exactly (72=72, n=100) — the gap
+  is *composition*, not retrieval (`docs_scratch/ruler_mh_rrf.md`); (b) **Self-Ask query
+  decomposition** with intermediate-answer-anchored hop-2 retrieval *hurts* on a strong reader
+  (60.6→53.5 SubEM, McNemar net −7, `qwen3.7-plus`) — decomposition loses baseline chunks and
+  error-propagates (`docs_scratch/ruler_mh_hop.md`). Notably that same run shows baseline
+  RULER-MH is **60.6% [50.8, 69.7]** on the shipped `qwen3.7-plus` reader (vs 45 at the
+  leaderboard-matched gpt-4o-mini tier), CI-overlapping HippoRAG's 66 — so most of the "loss"
+  is reader strength, not a memory-mechanism deficit (off-protocol; doesn't change the #2
+  ranking). Closing it *at the gpt-4o-mini tier* needs a learned graph traversal, not a cheap
+  read-time trick.
 - **The efficiency story**: HippoRAG-v2's ingestion runs LLM OpenIE over every token
   of the 197K–534K contexts; Tenet ingests with **embeddings only** and still reaches
   91% of its AR average — and beats every other published memory framework (Mem0,
@@ -391,11 +405,24 @@ questions/point (10 principals × 5 facts), Wilson 95% CIs, 0 API-error exclusio
 
 churn half-life: **tenet <2, rag 8, mem0 32, hipporag 8**.
 
-> **Outcome (read forward):** this falsification was diagnosed (below), fixed by a
-> read-time consistency rule (§9.1, → 98/92/82), and then **fully closed** by the
-> write-side embedding key-resolution (§13.1) — a fresh four-arm run scores Tenet
-> **100/100/100** at U=2/8/32, half-life 32, tied-for-first with Mem0-style and LLM-free
-> (§14). The section below is the original falsification, kept as the pre-registered record.
+> **Outcome (read forward) — one canonical story, stated to avoid number-drift across this
+> doc.** This table is the raw baseline with read-time consistency **OFF** (tenet U=32 ≈ 44%,
+> half-life <2) — the pre-registered falsification. The read-time consistency rule (§9.1) plus
+> the write-side key-resolution (§13.1) — **both defaulted ON in shipped `recall()`** — lift
+> Tenet's churn **half-life to 32**. The U=32 accuracy is **run-dependent: 82% (§9.1,
+> consistency-only) up to 100% (§14, fresh distillation + key-resolution + currency-context)**;
+> the spread is qwen3.7-plus reader non-determinism (temp-0 still drifts a few points on n=50)
+> plus the effect of the fixes stacking. **Honest ceiling claim: Tenet reaches half-life 32 and
+> ~82–100% at U=32 — it *ties* the idealized delete-outright Mem0-style arm (flat 100) but does
+> not beat it on raw accuracy.** The real win is vs the *actual* `mem0ai` package (COMPARISON
+> §A.2), which accumulates stale copies and loses (100 vs 73.3, p=0.0078). Every other section
+> that quotes a churn number refers back to this range. The table below is the original
+> falsification, kept as the pre-registered record.
+>
+> **Reproduce this falsification** (consistency OFF): `python scripts/bench_churn.py --updates
+> 2,4,8,16,32 --principals 10 --no-consistency`. A plain `bench_churn.py` (no `--no-consistency`)
+> now runs with consistency **0.70 — the shipped `recall()` default** — so it reflects the
+> product, not this baseline.
 
 **Ship gate: FALSIFIED, not a partial miss.** The pre-registered gate (Tenet half-life
 ≥2× best baseline, CI-separated at U=8) required Tenet to *lead*; instead Tenet is the
@@ -444,8 +471,10 @@ is real and reproduces here. Mem0-style, which *does* consolidate at write time 
 not retire-and-keep), stays flat at 100% through U=32 — the closest thing to Tenet's own
 mechanism family, and the one arm this build's stale-raw-leakage bug doesn't touch.
 
-Reproduce: `tenet bench run churnbench --seed 1 --principals 10 -- --n-facts 5
---distractor-sessions 4 --k 10 --arms tenet,rag,mem0,hipporag --updates 2,4,8,16,32`
+Reproduce **this falsification** (note `--no-consistency` — a plain run now defaults to the
+shipped consistency 0.70): `tenet bench run churnbench --seed 1 --principals 10 -- --n-facts 5
+--distractor-sessions 4 --k 10 --arms tenet,rag,mem0,hipporag --updates 2,4,8,16,32
+--no-consistency`
 (deterministic unit tests: `python scripts/test_churnbench.py`, no LLM). Artifacts:
 `docs/churnbench_results.json` (full curve), `docs/churnbench_misses.jsonl` (every
 miss, all arms), `docs/churnbench_curve.png` (plot).
@@ -558,6 +587,47 @@ Reproduce: `python scripts/bench_churn_fix_ab.py --updates 2,8,32 --principals 1
 (threshold sweep is a one-off analysis, not wired into `tenet bench run`).
 Artifacts: `docs/churnbench_threshold_sweep.json`, `docs/churnbench_fix_ab.json`,
 `docs/churnbench_fix_ab_misses.jsonl`.
+
+### 9.2 Write-time consolidation (`TENET_CONSOLIDATE`) — a measured-negative (measured 2026-07-14)
+
+The one arm that stayed flat at extreme churn in §9/§14 is **Mem0-style**, which
+*deletes* superseded memories outright so no stale copy can leak. We ported that exact
+mechanism into Tenet as an opt-in flag — `TENET_CONSOLIDATE=1`: at supersession, hard-archive
+the current raw slices that echo the retired value (cosine ≥ `TENET_CONSOLIDATE_TAU`,
+default 0.60, scoped to the retired fact), leaving the ledger rows for audit but dropping
+them from all recall including `as_of`. The question: does porting Mem0's delete-outright
+trick beat Tenet's default read-time machinery at U=32?
+
+**It doesn't.** On the shipped Qwen stack (`qwen3.6-flash` distill + `qwen3.7-plus` read +
+local bge-small, seed 1, n=50/point, fresh distillation), paired against the default arm in
+the same harness:
+
+| U | TENET (default) | TENET + consolidate |
+|---:|---:|---:|
+| 2  | **100.0** [92.9, 100.0] | **100.0** [92.9, 100.0] |
+| 8  | **100.0** [92.9, 100.0] | 98.0 [89.5, 99.6] |
+| 32 | 98.0 [89.5, 99.6] | 98.0 [89.5, 99.6] |
+
+Consolidation **ties or marginally trails** the default (98 vs 100 at U=8; both CIs overlap
+fully) — hard-archiving raw echoes removes verbatim detail the reader still uses. So the flag
+**ships default-OFF**, joining the honest ledger of measured-negative flags
+(`TENET_RAW_RECALL`, `TENET_AGG_READER`, `TENET_RETRACT`).
+
+**Honest framing — do NOT overclaim this as a churn win over Mem0.** The default arm's U=32
+number is run-dependent: **82%** (§9.1, tenet+1+2) to **98%** (this run, fresh distillation +
+key-resolution default-on since 2026-07-10), half-life 32 either way — but the *idealized*
+delete-outright **mem0-style** arm stays **flat 100** at U=32 (§9's headline table), so **on
+raw multi-fact churn accuracy Tenet does not beat it.** What this section shows is only that
+*porting* delete-outright into Tenet buys nothing over the read-time machinery — not that
+Tenet wins the churn axis. Tenet's real advantage over Mem0 is elsewhere: (1) the idealized
+delete-outright arm is **not how the real `mem0ai` package behaves** — the real package
+*accumulates* stale copies and loses a live head-to-head (§A.2); (2) Tenet keeps a **queryable
+belief history + time-travel** that delete-outright discards. The durable edge is *stays
+correct **and** keeps the history*, not a higher churn number.
+
+Reproduce: `LLM_PROVIDER=qwen EMBED_PROVIDER=local python scripts/bench_churn.py --updates
+2,8,32 --principals 10 --arms tenet,tenet_consolidate --consistency-threshold 0.70
+--currency-context`. Tests: `scripts/test_consolidate.py` (18 deterministic checks, no LLM).
 
 ## 10. Local distiller (zero-cloud) verdict
 
@@ -875,9 +945,14 @@ supersession-firing fix + §9.1 consistency):
 | 32 | **100.0** [88.6,100] | 30.0 [16.7,47.9] | **100.0** [88.6,100] | 30.0 [16.7,47.9] |
 | half-life | **32** | 8 | **32** | 8 |
 
-This **reverses the §9 falsification** (pre-fix Tenet was 46% / half-life <2 here): current
-Tenet is tied-for-first with Mem0-style at 100% across all U and dominates RAG/HippoRAG at
-extreme churn — with **LLM-free reads** (Mem0-style pays an LLM ADD/UPDATE per fact at write).
+This **reverses the §9 falsification** (pre-fix Tenet was 46% / half-life <2 here) and lifts
+Tenet's half-life to **32**. This particular run scored 100 at U=32; a separate run (§9.1)
+scored 82 — the honest claim across runs is **half-life 32, U=32 ≈ 82–100%** (see the §9
+"canonical story" note; the spread is reader non-determinism). At best Tenet **ties** the
+idealized delete-outright Mem0-style arm (flat 100) — it does **not** beat it on raw accuracy —
+but it does so with **LLM-free reads** (Mem0-style pays an LLM ADD/UPDATE per fact at write),
+and it beats the **real** `mem0ai` package, which unlike this idealized arm accumulates stale
+copies (COMPARISON §A.2: 100 vs 73.3, p=0.0078).
 
 **B. MAB FactConsolidation** (matched 7B, n=200 pooled): Tenet **90.0 SH / 36.0 MH** leads all
 four methods incl. published-SOTA CAR (87.5 / 33.0) — see §6.1.

@@ -1,0 +1,31 @@
+{
+  "config": {
+    "principals": 6,
+    "k": 8,
+    "reader": "qwen3.7-plus",
+    "mem0_llm": "qwen3.7-plus",
+    "embedder": "bge-small"
+  },
+  "arms": {
+    "rag": {
+      "acc": 1.0,
+      "n": 30,
+      "stale_leak": 0.0
+    },
+    "tenet": {
+      "acc": 1.0,
+      "n": 30,
+      "stale_leak": 0.0
+    },
+    "mem0": {
+      "acc": 0.7333333333333333,
+      "n": 30,
+      "stale_leak": 0.26666666666666666
+    }
+  },
+  "mcnemar": {
+    "tenet_only": 8,
+    "mem0_only": 0,
+    "p": 0.0078125
+  }
+}

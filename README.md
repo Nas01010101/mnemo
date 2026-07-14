@@ -81,6 +81,14 @@ mem.get_all(user_id="alex")                        # → readable belief state, 
 
 Full honest matrix + benchmark comparability caveats: [`docs/COMPARISON.md`](docs/COMPARISON.md).
 
+> **Reproducibility is the pitch.** Independent 2026 audits found the field's headline
+> numbers don't survive reproduction — Mem0 claims 93.4% on LongMemEval but reproduces at
+> [73.8% hosted / 32.4% OSS](docs/COMPARISON.md#-frontier-reality-check--the-2026-reproduction-crisis-verified-2026-07-14);
+> LoCoMo's answer key is 6.4% wrong. Tenet reports **every** number with a Wilson 95% CI,
+> ships **four flags default-OFF because we measured them as no-benefit**, and **falsified
+> its own churn claim in public** before fixing it. Built **100% on Qwen Cloud** (no OpenAI
+> in the product path). Every result reproduces from one command.
+
 ## Results at a glance
 
 | benchmark | metric | Tenet | comparison | source |
@@ -143,9 +151,10 @@ retrieval collapses.
 
 **As one templated fact is updated 2→12 times, RAG-memory falls 100%→50%. Tenet holds 100%.**
 
-<sub>The single-attribute churn primitive (`bench_horizon`). Under harder *paraphrased*, multi-attribute
-churn ([ChurnBench §9](docs/BENCHMARK.md#9-churnbench--parametric-high-churn-stress-test-measured-2026-07-10)),
-Tenet's default-on read-time consistency reaches 98/92/82 at U=2/8/32 — falsification and fix reported in full.</sub>
+<sub>The single-attribute churn primitive (`bench_horizon`), pre-registered to favor Tenet. Under harder
+*paraphrased*, multi-attribute churn ([ChurnBench §9](docs/BENCHMARK.md#9-churnbench--parametric-high-churn-stress-test-measured-2026-07-10)),
+the honest picture: read-time fixes lift Tenet's half-life <2→32 (U=32 ≈ 82–100% across runs); it ties an
+idealized delete-arm but beats the real `mem0ai` package — falsification and fix reported in full.</sub>
 
 </div>
 
@@ -316,12 +325,19 @@ Tenet is a **frontier, not a point** — one `expand` knob trades tokens for acc
   `gpt-4o-mini` reader the parity point edges ahead (60.0 vs 55.0).
 - **Best accuracy-per-token** at the efficiency point (1.6× RAG at *half* its context) — and
   **reader-robust** across the `gpt-4o-mini` and `gpt-4o` readers we ran (≈1.6×).
-- **Churn-robust (templated primitive):** on the single-attribute churn primitive (§3,
-  `bench_horizon`) Tenet holds 100% at every update level while RAG collapses to 50% — the
-  collapse holds under a gpt-4o reader, so it's *structural*, not reader weakness. On the
-  harsher *paraphrased* [ChurnBench](docs/BENCHMARK.md#9-churnbench--parametric-high-churn-stress-test-measured-2026-07-10)
-  (§9), read-time consistency (now default-on) lifts Tenet from worst-arm to **98/92/82** at
-  U=2/8/32, with Mem0-style delete-outright consolidation still leading at extreme churn.
+- **Churn — reported honestly, no strawman.** On the single-attribute primitive (§3,
+  `bench_horizon`) Tenet holds 100% vs RAG's 50% collapse. But that primitive is
+  pre-registered to *structurally favor* Tenet — so we also run the harder multi-fact
+  [ChurnBench](docs/BENCHMARK.md#9-churnbench--parametric-high-churn-stress-test-measured-2026-07-10)
+  (§9), where the honest picture is: read-time fixes lift Tenet's churn half-life from <2 to
+  **32** (~82% at U=32, §9.1), but an *idealized* delete-outright Mem0-style arm stays flat 100
+  there — **Tenet does not beat it on raw churn accuracy, and we say so.** What Tenet wins is
+  against the **real `mem0ai` package**, which (unlike that idealized arm) *accumulates* stale
+  copies — in a live head-to-head it answers with a superseded value while Tenet keeps a clean,
+  queryable belief history ([§A.2](docs/COMPARISON.md)). The durable edge over Mem0 isn't
+  churn accuracy — it's **staying correct *and* keeping the history Mem0 deletes, at far less
+  context.** (We ported delete-outright into Tenet as `TENET_CONSOLIDATE` and measured it a
+  **no-benefit** — default-OFF, [§9.2](docs/BENCHMARK.md#92-write-time-consolidation-tenet_consolidate--a-measured-negative-measured-2026-07-14).)
 - **Ablation:** the belief–evidence consistency rule alone lifts current-value accuracy 55%→100%.
 - **Honest:** the one category still behind RAG is multi-session synthesis (42.9 vs 57.1, up
   from 28.6). We report it. *(Eval off-Qwen, one seed, reader noise ≈±5–7pp; shipped system uses Qwen Cloud.)*
