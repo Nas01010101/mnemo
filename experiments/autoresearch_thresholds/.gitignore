@@ -1,2 +1,3 @@
 .autoresearch/
 *.tmp
+journal*.jsonl
