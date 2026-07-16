@@ -29,9 +29,10 @@ retrieval with **belief-anchored evidence expansion** — spending spare context
 query-relevant turns from the sessions the belief state already surfaced. Tenet holds
 **100% current-value accuracy across all levels of the templated single-attribute churn
 primitive** (where a strong RAG-memory falls to 50%; on the harder *paraphrased*
-multi-attribute ChurnBench, §4.8, this claim was falsified, then fully recovered to
-100/100/100 — half-life 32, tied-for-first with delete-outright Mem0-style, LLM-free —
-by a read-time consistency rule plus write-side key-resolution, §4.9/§14), matches strong RAG on retrieval recall (95–97.5%), and — with expansion — **matches its
+multi-attribute ChurnBench, §4.8, this claim was falsified, then partially recovered
+by an LLM-free, read-time consistency rule plus currency-structured context — churn
+half-life <2 → **8** (U=2/8/32 = 98/92/82%), still behind delete-outright Mem0-style's
+half-life 32 — falsification and fix reported in full, §4.8/§4.9), matches strong RAG on retrieval recall (95–97.5%), and — with expansion — **matches its
 one-shot answer accuracy at equal-or-lower token budget** (57.5% vs 57.5% under a gpt-4o
 reader) while retaining a high-efficiency operating point at **half the context** and the
 **best accuracy-per-token** of the systems we evaluate. Tenet thus traces an
