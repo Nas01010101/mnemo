@@ -21,7 +21,7 @@ Usage:
 """
 from __future__ import annotations
 
-import argparse, json, math, re, string, sys, time
+import argparse, json, math, os, re, string, sys, time
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -32,7 +32,10 @@ from tenet import config  # noqa: E402
 from tenet import Tenet  # noqa: E402
 from tenet.navigate import navigate  # noqa: E402
 
-CACHE = Path(__file__).resolve().parent.parent / "data" / "cache" / "factcon"
+# data/ is a symlink to an external volume; FACTCON_CACHE_DIR overrides it (same
+# footgun/fix as bench_churn.py's CHURN_CACHE_DIR — see BENCHMARK.md §9 repro note).
+CACHE = Path(os.environ["FACTCON_CACHE_DIR"]) if os.environ.get("FACTCON_CACHE_DIR") else (
+    Path(__file__).resolve().parent.parent / "data" / "cache" / "factcon")
 
 # --------------------------------------------------------------------------
 # MAB official scoring — copied VERBATIM from utils/eval_other_utils.py

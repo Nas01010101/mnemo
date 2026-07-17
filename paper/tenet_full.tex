@@ -44,8 +44,9 @@ calls an LLM. \tenet{} holds $100\%$ on this templated single-attribute churn pr
 every update level (\S\ref{sec:churn}); on the harsher \emph{paraphrased} multi-attribute
 ChurnBench (\S\ref{sec:churnbench}) it was initially \emph{falsified} (worst arm); a
 read-time consistency rule plus write-side embedding key-resolution---both defaulted
-on---recover it to $100/100/100$ at $U{=}2/8/32$ (half-life $32$), tying delete-outright
-Mem0-style for first while keeping LLM-free reads. On
+on---lift its churn half-life from ${<}2$ to $32$ ($U{=}32 \approx 82$--$100\%$ across
+runs, reader non-determinism): at best this \emph{ties} delete-outright Mem0-style (flat
+$100$) without beating it on raw accuracy, while keeping LLM-free reads. On
 MemoryAgentBench \textsc{FactConsolidation} (ICLR~2026) it scores $86.5\%$ single-hop
 \ci{82.8}{89.5}---above the published \texttt{gpt-4o-mini}-tier state of the art
 ($78.0$) despite using a local 7B backbone---and ties the multi-hop state of the art
@@ -665,19 +666,25 @@ All regression gates pass with the fix defaulted on (7 deterministic suites;
 invariant---that arm never stores raw slices), so \texttt{recall()}'s
 \texttt{consistency\_threshold} now defaults to $0.70$ in shipped code.
 
-\paragraph{Full recovery via write-side key resolution.} The read-time fix attacks stale
-raw evidence \emph{after} it is stored; a complementary write-side fix removes it at the
-source. The embedding key-resolution of \S\ref{sec:limits} (a conversational update
-supersedes a same-subject belief whose attribute-key embeds within $0.78$ and whose text
-clears the $0.66$ floor) makes paraphrased updates actually collide at ingestion, so far
-fewer stale versions ever enter the raw pool. With both fixes on (the shipped default), a
-fresh four-arm run recovers \textsc{ChurnBench} to $100/100/100$ at $U{\in}\{2,8,32\}$
-(half-life $32$, $n{=}30$, Wilson CIs in \texttt{docs/BENCHMARK.md}~\S14): \tenet{} now
-\textbf{ties delete-outright Mem0-style for first} and dominates the retrieval baselines
-(RAG/HippoRAG-v2-style collapse to $30$ at $U{=}32$)---while keeping \textbf{LLM-free
-reads}, where Mem0-style pays an LLM add/update per write. The pre-registered falsification
-is thus fully closed, and by a mechanism the belief-state design predicts rather than a
-benchmark-specific patch.
+\paragraph{A further write-side fix lifts the half-life to 32 (run-dependent).} The
+read-time fix attacks stale raw evidence \emph{after} it is stored; a complementary
+write-side fix removes it at the source. The embedding key-resolution of
+\S\ref{sec:limits} (a conversational update supersedes a same-subject belief whose
+attribute-key embeds within $0.78$ and whose text clears the $0.66$ floor) makes
+paraphrased updates actually collide at ingestion, so far fewer stale versions ever enter
+the raw pool. With both fixes on (the shipped default), a four-arm run at $n{=}30$
+(Wilson CIs in \texttt{docs/BENCHMARK.md}~\S14) scores \textsc{ChurnBench} at
+$100/100/100$ across $U{\in}\{2,8,32\}$ and dominates the retrieval baselines
+(RAG/HippoRAG-v2-style collapse to $30$ at $U{=}32$); a separate run under the identical
+config (\S9.1 in \texttt{docs/BENCHMARK.md}) scores $82$ at $U{=}32$ instead of
+$100$---\texttt{qwen3.7-plus} reader non-determinism on $n{=}30$--$50$, not a
+configuration difference. \textbf{Honest ceiling claim: churn half-life $32$,
+$U{=}32 \approx 82$--$100\%$ across runs}: at best \tenet{} \emph{ties} delete-outright
+Mem0-style (flat $100$) while keeping \textbf{LLM-free reads}, where Mem0-style pays an
+LLM add/update per write, but it does \textbf{not} beat Mem0-style on raw churn accuracy.
+The pre-registered falsification is closed on the half-life metric---by a mechanism the
+belief-state design predicts rather than a benchmark-specific patch---not by surpassing
+the idealized delete-outright arm.
 
 \subsection{Closing the write-path dependency: a local distiller}\label{sec:localdistill}
 Every result above distills with Qwen Cloud (\texttt{qwen3.7-plus}); the write path---turning
@@ -811,11 +818,14 @@ adversarial updates are untested. \textbf{Stale raw-turn leakage under natural
 conversational churn} (\S\ref{sec:churnbench}, measured, not hypothetical): with several
 attributes each updated many times via paraphrased statements, already-superseded raw
 turns can survive the write-time stale-echo filter and outvote the correct current fact
-in the reader's context. \textbf{Partially fixed} (\S\ref{sec:churnfix}): read-time
-belief-evidence consistency plus a currency-structured reader context raise churn
-half-life from $<2$ to $8$ (both regression-gate-clean, defaulted on), but the combined
-fix still falls short of Mem0-style's write-time-consolidation immunity at $U{=}32$ ---
-the residual gap, not the whole failure mode, is what remains open.
+in the reader's context. \textbf{Fixed, with a caveat} (\S\ref{sec:churnfix}): read-time belief-evidence
+consistency plus a currency-structured reader context raise churn half-life from $<2$ to
+$8$ on their own (both regression-gate-clean, defaulted on); adding write-side embedding
+key-resolution lifts it further to $32$ ($U{=}32 \approx 82$--$100\%$ across runs, reader
+non-determinism). At best this \emph{ties} Mem0-style's write-time-consolidation
+immunity at $U{=}32$ (flat $100$)---it does not surpass it on raw accuracy, only match it
+while keeping LLM-free reads---so the failure mode is closed on the half-life metric, not
+strictly dominated.
 
 \section{Conclusion}
 Treating agent memory as a self-consistent belief state rather than a document index

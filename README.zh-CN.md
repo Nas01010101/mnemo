@@ -198,6 +198,10 @@ python -m tenet.mcp_server                   # 或 MCP 服务器（learn/recall/
 （或 `LLM_PROVIDER=openrouter`），因为它们要用一次 LLM 调用来蒸馏文本——
 没有密钥时你会看到明确的 "memory write failed: ..." 报错，而不是静默失败。
 
+默认数据库位置：`data/tenet.db`（仓库本地、已加入 gitignore，首次写入时自动创建，无需额外设置）。
+可通过 `TENET_DB_PATH=/path/to/db` 覆盖。如果这台机器上 `data/` 无法创建或写入，默认路径会
+自动回退到 `~/.tenet/tenet.db`。
+
 更多示例见 [`examples/`](examples/) —— 零密钥演示、快速上手、助手循环、MCP 客户端、
 LangChain 适配器、LangGraph `BaseStore` 适配器。
 

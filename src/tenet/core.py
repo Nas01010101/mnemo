@@ -62,6 +62,7 @@ class Tenet:
                 continue
             ids.append(self.core.store(
                 f.statement, key=key, salience=f.salience, pinned=pinned,
+                scenario=f.scenario,
             ))
         return ids
 
@@ -94,7 +95,8 @@ class Tenet:
                 self.core.retract(f.key)
                 continue
             fact_ids.append(self.core.store(f.statement, key=f.key, salience=f.salience,
-                                             source=source, pinned=pinned))
+                                             source=source, pinned=pinned,
+                                             scenario=f.scenario))
         raw_ids = []
         for role, content in norm:
             if not content.strip():

@@ -29,6 +29,12 @@ build/
 *.log
 recordings/
 # ---- Local data (memory store) ----
+# `data` (no trailing slash) also matches the entry itself when it's a
+# symlink — `data/` alone doesn't (git only matches symlinks-as-directories
+# with the slash form in some versions), and a symlink accidentally
+# `git add -f`'d here is exactly B1 (see memory.py's _resolve_default_db_path
+# docstring): it breaks every fresh clone on a machine without that target.
+data
 data/
 *.db
 

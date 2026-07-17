@@ -41,12 +41,33 @@ from .consistency import stale_raw_ids
 from .dynamics import Dynamics
 from .index import ResidentIndex
 from .navigate import navigate as _navigate
+from .usage_recall import rrf_merge
 
 # TENET_DB_PATH lets callers (tests, mcp_server's module-level default Tenet())
 # redirect the default db off data/ when that symlink target isn't reachable
 # (e.g. an external volume TCC-blocks this process — see BENCHMARK.md §9).
-_DEFAULT_DB = Path(os.environ["TENET_DB_PATH"]) if os.environ.get("TENET_DB_PATH") else (
-    Path(__file__).resolve().parent.parent.parent / "data" / "tenet.db")
+#
+# `data` is also, on the maintainer's machine, a symlink onto an external SSD
+# (dev convenience — the dataset cache lives there). On any OTHER machine that
+# symlink is either absent (fine — mkdir below just creates a real data/ dir)
+# or, if it was ever git-tracked and checked out, DANGLING (the dirent exists
+# but its target doesn't) — and `Path.mkdir(parents=True, exist_ok=True)` on a
+# dangling symlink raises FileExistsError (the entry exists, but `is_dir()`
+# can't confirm it, so exist_ok can't save it). Detect that case up front and
+# fall back to a machine-local dir so a fresh clone works with zero env vars.
+def _resolve_default_db_path(repo_root: Path | None = None) -> Path:
+    if os.environ.get("TENET_DB_PATH"):
+        return Path(os.environ["TENET_DB_PATH"])
+    root = repo_root if repo_root is not None else Path(__file__).resolve().parent.parent.parent
+    data_dir = root / "data"
+    dangling = data_dir.is_symlink() and not data_dir.exists()
+    unwritable = data_dir.exists() and data_dir.is_dir() and not os.access(data_dir, os.W_OK)
+    if dangling or unwritable:
+        return Path.home() / ".tenet" / "tenet.db"
+    return data_dir / "tenet.db"
+
+
+_DEFAULT_DB = _resolve_default_db_path()
 
 # Forgetting knobs
 _HALFLIFE_S = 14 * 24 * 3600  # a memory's recency weight halves every 14 days
@@ -110,6 +131,17 @@ _TAU_CONSOLIDATE = float(os.environ.get("TENET_CONSOLIDATE_TAU", "0.60"))
 
 def _consolidate_default() -> bool:
     return os.environ.get("TENET_CONSOLIDATE", "").strip().lower() in ("1", "true", "on", "yes")
+
+
+# Usage-scenario retrieval (usage_recall.py) — an OPTIONAL ReMe-style (arXiv:2512.10696,
+# Tongyi Lab) recall knob: RRF-fuse content-similarity ranking with usage-scenario-
+# similarity ranking (query vs each fact's distiller-tagged "when would this be used"
+# embedding). Gates BOTH sides: store() only pays the extra embedding call when this is
+# on (nothing computed/stored when off, matching TENET_CONSOLIDATE's "opt-in cost, not
+# just opt-in behavior" pattern), and recall() only fetches/merges scenario embeddings
+# when on. Default OFF; TENET_USAGE_RECALL=1 (or store(..., usage_recall=True) /
+# recall(..., usage_recall=True) per call) opts in.
+_USAGE_RECALL_DEFAULT = os.environ.get("TENET_USAGE_RECALL", "").strip().lower() in ("1", "true", "on", "yes")
 
 
 # --- Embedding-based key resolution (TENET_KEY_RESOLUTION) ------------------
@@ -249,6 +281,16 @@ class MemoryCore:
                  archived INTEGER NOT NULL DEFAULT 0
                )"""
         )
+        # Usage-scenario retrieval columns (usage_recall.py, TENET_USAGE_RECALL,
+        # ReMe-style opt-in knob) — added after the table above shipped, so a
+        # pre-existing db file (any cached benchmark store) won't have them yet.
+        # ALTER defensively rather than baking into CREATE TABLE IF NOT EXISTS,
+        # which only applies to a brand-new file.
+        for _col, _decl in (("scenario_text", "TEXT"), ("scenario_embedding", "BLOB")):
+            try:
+                self.db.execute(f"ALTER TABLE memories ADD COLUMN {_col} {_decl}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
         # keyed-supersession lookups are per-insert; without this index they are
         # full scans, which turns bulk ingestion (benchmarks: ~10k facts/sequence)
         # into O(n^2). Harmless at conversation scale.
@@ -312,7 +354,10 @@ class MemoryCore:
         dedup: float = 0.985,
         surprise_gate: float | None = None,
         consolidate: bool | None = None,
+        scenario: str | None = None,
+        usage_recall: bool | None = None,
         _vec: np.ndarray | None = None,
+        _scenario_vec: np.ndarray | None = None,
     ) -> int:
         """Add a memory.
 
@@ -323,16 +368,33 @@ class MemoryCore:
           that embedding similarity alone cannot separate from restatements.
         - Without a key, fall back to embedding proximity: >= dedup ⇒ restatement
           (refresh); supersede..dedup with differing text ⇒ supersede. Best-effort only.
+
+        `scenario` — usage_recall.py's ReMe-style usage-scenario tag (distill.py's
+        `Fact.scenario`, "when would this be useful to retrieve"). Only embedded and
+        stored when usage_recall is on (default `_USAGE_RECALL_DEFAULT`, env
+        `TENET_USAGE_RECALL=1`, or pass True/False per call) — off (the default),
+        this parameter is accepted but silently dropped, so no extra embedding call
+        is ever paid when the knob is disabled. Harmless to always pass (like
+        distill()'s `action` field for retraction) — callers don't need to know
+        whether the knob is on.
         """
         text = text.strip()
         if not text:
             raise ValueError("empty memory")
         vec = _vec if _vec is not None else self._embed(text)  # network call — outside the lock
+        use_usage_recall = _USAGE_RECALL_DEFAULT if usage_recall is None else usage_recall
+        scenario_vec = None
+        scenario = (scenario or "").strip()
+        if use_usage_recall and scenario:
+            # _scenario_vec (test-only, like _vec) skips the real embedding call.
+            scenario_vec = _scenario_vec if _scenario_vec is not None else self._embed(scenario)
         with self._lock:
             row_id = self._store_locked(
                 text, key=key, kind=kind, source=source, pinned=pinned, salience=salience,
                 valid_at=valid_at, supersede=supersede, dedup=dedup,
                 surprise_gate=surprise_gate, consolidate=consolidate, vec=vec,
+                scenario_text=scenario if scenario_vec is not None else None,
+                scenario_vec=scenario_vec,
             )
             self.db.commit()
             self._dyn_dirty = True  # ledger changed -> refit dynamics lazily
@@ -384,7 +446,9 @@ class MemoryCore:
 
     def _store_locked(self, text: str, *, key, kind, source, pinned, salience,
                        valid_at, supersede, dedup, surprise_gate, vec: np.ndarray,
-                       consolidate: bool | None = None) -> int:
+                       consolidate: bool | None = None,
+                       scenario_text: str | None = None,
+                       scenario_vec: np.ndarray | None = None) -> int:
         """Everything store()/store_many() do per item EXCEPT acquiring the lock and
         committing — so store_many() can run many of these in one transaction.
         Caller MUST hold self._lock. Mirrors every DB mutation into the resident
@@ -458,8 +522,10 @@ class MemoryCore:
                     idx.mark_expired([hit[0]], va, t)
         cur = self.db.execute(
             "INSERT INTO memories(text, kind, source, skey, embedding, salience, valid_at, "
-            "created_at, last_access, pinned) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned)),
+            "created_at, last_access, pinned, scenario_text, scenario_embedding) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+            (text, kind, source, key, vec.tobytes(), float(salience), va, t, t, int(pinned),
+             scenario_text, scenario_vec.tobytes() if scenario_vec is not None else None),
         )
         row_id = cur.lastrowid
         if idx is not None:
@@ -632,6 +698,7 @@ class MemoryCore:
         consistency_threshold: float | None = _CONSISTENCY_THRESHOLD_DEFAULT,
         agg_reader: bool = _AGG_READER_DEFAULT,
         raw_recall: bool = _RAW_RECALL_DEFAULT,
+        usage_recall: bool = _USAGE_RECALL_DEFAULT,
     ) -> list[Memory]:
         """Most relevant memories, ranked by relevance × decay.
 
@@ -685,6 +752,17 @@ class MemoryCore:
         byte-identical to before this parameter existed. Only changes pool
         COMPOSITION (how many raw-vs-fact slots k allocates); still relevance x
         decay ranked within each pool, same annotation-only invariant.
+
+        `usage_recall` — OPTIONAL ReMe-style usage-scenario retrieval (arXiv:2512.10696,
+        Tongyi Lab; usage_recall.py): RRF-fuses the content-similarity ranking above
+        with a SECOND ranking over each fact's distiller-tagged usage-scenario
+        embedding ("when would this be useful", stored only for facts written with
+        the knob on — see `store()`'s `scenario`/`usage_recall`). UNLIKE `agg_reader`/
+        `raw_recall`, this DOES re-rank (fusion is the point of a second retrieval
+        signal) rather than just filter. Default OFF (`_USAGE_RECALL_DEFAULT`,
+        `TENET_USAGE_RECALL=1` to opt in globally) — with it off, or when no stored
+        fact has a usage-scenario embedding, `scored`'s order is untouched and this
+        method is byte-identical to before this parameter existed.
         """
         qv = self._embed(query)  # network call — kept outside the lock
         with self._lock:
@@ -723,6 +801,17 @@ class MemoryCore:
                 for rel, dec, row in zip(rels, decay_vec, rows)
             ]
             scored.sort(key=lambda x: x[0], reverse=True)
+
+            # Usage-scenario retrieval (usage_recall.py, ChurnBench/ReMe follow-up):
+            # RRF-fuse the content ranking above with a scenario-similarity ranking,
+            # only when requested AND at least one row in this pool has a stored
+            # usage-scenario embedding (as_of/time-travel calls don't get scenario
+            # rows to keep this call byte-identical when there's nothing to fuse).
+            if usage_recall and as_of is None:
+                scen_vecs = self._scenario_vectors({row["id"] for _s, _r, row in scored})
+                if scen_vecs:
+                    sims = {row_id: float(np.dot(qv, v)) for row_id, v in scen_vecs.items()}
+                    scored = rrf_merge(scored, sims)
 
             # Belief-store consistency: the current facts are the belief state. A raw
             # slice that echoes a SUPERSEDED belief (e.g. "I moved to Boston" after the
@@ -1050,6 +1139,24 @@ class MemoryCore:
         if self._index is None:
             return []
         return self._index.rows_for_mask(self._index.mask_expired_keyed_fact())
+
+    def _scenario_vectors(self, ids: set[int]) -> dict[int, np.ndarray]:
+        """{id: usage-scenario embedding} for whichever of `ids` have one stored
+        (usage_recall.py). Deliberately a direct sqlite query, NOT a ResidentIndex
+        array — scenario embeddings are rare (opt-in, only rows written with the
+        knob on have one) and this only runs when `recall(usage_recall=True)` is
+        asked for, so it doesn't pay for a resident array on the default hot path.
+        Placeholder-count interpolation only; `ids` are int row ids, never user text."""
+        if not ids:
+            return {}
+        placeholders = ",".join("?" * len(ids))
+        rows = self.db.execute(  # nosemgrep: python.lang.security.audit.formatted-sql-query.formatted-sql-query, python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+            f"SELECT id, scenario_embedding FROM memories "
+            f"WHERE scenario_embedding IS NOT NULL AND id IN ({placeholders})",
+            list(ids),
+        ).fetchall()
+        return {row["id"]: np.frombuffer(row["scenario_embedding"], dtype=np.float32)
+                for row in rows}
 
     def _nearest_current(self, vec: np.ndarray):
         """Highest-cosine current row (unkeyed store()'s dedup/supersede path).

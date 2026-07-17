@@ -1,0 +1,220 @@
+{
+  "config": {
+    "benchmark": "MAB FactConsolidation (MemoryAgentBench, ICLR 2026, arXiv:2507.05257)",
+    "reproduce": "LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic",
+    "reader": "local qwen2.5:7b (ollama)",
+    "embedder": "local bge-small (sentence-transformers)",
+    "keys": "heuristic (deterministic, zero-LLM ingestion)",
+    "qpc": 10,
+    "scoring": "MAB official SubEM (normalize + substring + max-over-golds), verbatim",
+    "prompt": "MAB official 'rag_agent' template, verbatim",
+    "note": "BOUNDED reproduction, not the full n=100/cell (n=800) the docs describe \u2014 session wall-clock, not $ cost, was the constraint (LLM_PROVIDER=ollama is $0 either way; a full qpc=100 attempt was in progress and reached 60/100 on one cell before the harness reclaimed the background task at ~27 min). qpc truncates to the FIRST N questions per cell in dataset order (scripts/bench_factcon.py), not a random subsample \u2014 so this is not guaranteed to be an unbiased spot-check of the full 100."
+  },
+  "per_cell": {
+    "mh_262k": {
+      "rag": {
+        "correct": 0,
+        "n": 10,
+        "acc": 0.0,
+        "ci_lo": 0.0,
+        "ci_hi": 27.8
+      },
+      "tenet": {
+        "correct": 2,
+        "n": 10,
+        "acc": 20.0,
+        "ci_lo": 5.7,
+        "ci_hi": 51.0
+      }
+    },
+    "mh_32k": {
+      "rag": {
+        "correct": 0,
+        "n": 10,
+        "acc": 0.0,
+        "ci_lo": 0.0,
+        "ci_hi": 27.8
+      },
+      "tenet": {
+        "correct": 3,
+        "n": 10,
+        "acc": 30.0,
+        "ci_lo": 10.8,
+        "ci_hi": 60.3
+      }
+    },
+    "mh_64k": {
+      "rag": {
+        "correct": 0,
+        "n": 10,
+        "acc": 0.0,
+        "ci_lo": 0.0,
+        "ci_hi": 27.8
+      },
+      "tenet": {
+        "correct": 3,
+        "n": 10,
+        "acc": 30.0,
+        "ci_lo": 10.8,
+        "ci_hi": 60.3
+      }
+    },
+    "mh_6k": {
+      "rag": {
+        "correct": 1,
+        "n": 10,
+        "acc": 10.0,
+        "ci_lo": 1.8,
+        "ci_hi": 40.4
+      },
+      "tenet": {
+        "correct": 5,
+        "n": 10,
+        "acc": 50.0,
+        "ci_lo": 23.7,
+        "ci_hi": 76.3
+      }
+    },
+    "sh_262k": {
+      "rag": {
+        "correct": 5,
+        "n": 10,
+        "acc": 50.0,
+        "ci_lo": 23.7,
+        "ci_hi": 76.3
+      },
+      "tenet": {
+        "correct": 6,
+        "n": 10,
+        "acc": 60.0,
+        "ci_lo": 31.3,
+        "ci_hi": 83.2
+      }
+    },
+    "sh_32k": {
+      "rag": {
+        "correct": 5,
+        "n": 10,
+        "acc": 50.0,
+        "ci_lo": 23.7,
+        "ci_hi": 76.3
+      },
+      "tenet": {
+        "correct": 8,
+        "n": 10,
+        "acc": 80.0,
+        "ci_lo": 49.0,
+        "ci_hi": 94.3
+      }
+    },
+    "sh_64k": {
+      "rag": {
+        "correct": 6,
+        "n": 10,
+        "acc": 60.0,
+        "ci_lo": 31.3,
+        "ci_hi": 83.2
+      },
+      "tenet": {
+        "correct": 6,
+        "n": 10,
+        "acc": 60.0,
+        "ci_lo": 31.3,
+        "ci_hi": 83.2
+      }
+    },
+    "sh_6k": {
+      "rag": {
+        "correct": 3,
+        "n": 10,
+        "acc": 30.0,
+        "ci_lo": 10.8,
+        "ci_hi": 60.3
+      },
+      "tenet": {
+        "correct": 8,
+        "n": 10,
+        "acc": 80.0,
+        "ci_lo": 49.0,
+        "ci_hi": 94.3
+      }
+    }
+  },
+  "pooled": {
+    "SH": {
+      "rag": {
+        "correct": 19,
+        "n": 40,
+        "acc": 47.5,
+        "ci_lo": 32.9,
+        "ci_hi": 62.5
+      },
+      "tenet": {
+        "correct": 28,
+        "n": 40,
+        "acc": 70.0,
+        "ci_lo": 54.6,
+        "ci_hi": 81.9
+      }
+    },
+    "MH": {
+      "rag": {
+        "correct": 1,
+        "n": 40,
+        "acc": 2.5,
+        "ci_lo": 0.4,
+        "ci_hi": 12.9
+      },
+      "tenet": {
+        "correct": 13,
+        "n": 40,
+        "acc": 32.5,
+        "ci_lo": 20.1,
+        "ci_hi": 48.0
+      }
+    }
+  },
+  "cross_check_printed_pooled_lines": [
+    {
+      "arm": "rag",
+      "tag": "SH",
+      "printed_acc": 47.5,
+      "printed_n": 40
+    },
+    {
+      "arm": "rag",
+      "tag": "MH",
+      "printed_acc": 2.5,
+      "printed_n": 40
+    },
+    {
+      "arm": "tenet",
+      "tag": "SH",
+      "printed_acc": 70.0,
+      "printed_n": 40
+    },
+    {
+      "arm": "tenet",
+      "tag": "MH",
+      "printed_acc": 32.5,
+      "printed_n": 40
+    }
+  ],
+  "provenance": "Re-run 2026-07-16 to backfill the missing standalone evidence artifact for the 86.5 SH / 30.2 MH claim already published in README/BENCHMARK.md/COMPARISON.md since commit f6a0ac0 (2026-07-07); no raw per-question output from that original run was found in the repo, docs_scratch/, experiments/, or data/bench_runs.jsonl, so this is a fresh, same-config reproduction, not a recovered original artifact. Cost: $0 (LLM_PROVIDER=ollama, local qwen2.5:7b; EMBED_PROVIDER=local; --keys heuristic is zero-LLM ingestion) \u2014 DashScope was never called for this run.",
+  "published_claim": {
+    "source": "README.md, docs/BENCHMARK.md section 6, docs/COMPARISON.md (since commit f6a0ac0, 2026-07-07)",
+    "sh_pooled": {
+      "acc": 86.5,
+      "ci_lo": 82.8,
+      "ci_hi": 89.5,
+      "n": 400
+    },
+    "mh_pooled": {
+      "acc": 30.2,
+      "ci_lo": 26.0,
+      "ci_hi": 34.9,
+      "n": 400
+    }
+  },
+  "discrepancy_note": "MH pooled (32.5% [20.1,48.0], n=40) is CONSISTENT with the published 30.2% [26.0,34.9] (n=400) \u2014 well within this run's wide CI. SH pooled (70.0% [54.6,81.9], n=40) is LOWER than the published 86.5% [82.8,89.5] (n=400); 86.5 sits just outside this run's 95% CI upper bound (81.9). At n=40 per axis (10x smaller than the published n=400) the CI is wide and the qpc truncation is non-random (see config.note), so this is flagged as a real but UNRESOLVED discrepancy, not a confirmed correction of the published number \u2014 reported honestly per this task's instructions rather than silently kept unverified or silently overwritten on an under-powered sample. Recommend a full --qpc 100 run (all 8 cells, ~2-3h wall-clock on local ollama, $0) to resolve which number is right."
+}

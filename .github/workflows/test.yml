@@ -35,6 +35,26 @@ jobs:
         run: python scripts/test_langgraph_store.py
       - name: adaptive multi-hop navigation tests (deterministic, no LLM)
         run: python scripts/test_navigate.py
+      - name: default-db-path resolution tests (deterministic, no LLM — B1 regression)
+        run: python scripts/test_default_db_path.py
+      - name: embedding-based key-resolution tests (deterministic, no LLM)
+        run: python scripts/test_key_resolution.py
+      - name: retraction/tombstone tests (deterministic, distill stubbed, no LLM)
+        run: python scripts/test_retract.py
+      - name: write-time consolidation tests (deterministic, no LLM)
+        run: python scripts/test_consolidate.py
+      - name: read-time aggregation tests (deterministic, no LLM)
+        run: python scripts/test_aggregate.py
+      - name: raw-turn-favored recall tests (deterministic, no LLM)
+        run: python scripts/test_raw_recall.py
+      - name: Mem0-compatible CRUD facade tests (deterministic, distill stubbed, no LLM)
+        run: python scripts/test_mem0_api.py
+      - name: ChurnBench generator + scorer tests (deterministic, no LLM)
+        run: python scripts/test_churnbench.py
+      - name: usage-scenario retrieval tests (deterministic, distill stubbed, no LLM)
+        run: python scripts/test_usage_recall.py
+      - name: ReMe head-to-head harness tests (deterministic, dry-run stubbed, no LLM, no reme-ai venv)
+        run: python scripts/test_reme_h2h.py
 
   install-smoke:
     runs-on: ubuntu-latest

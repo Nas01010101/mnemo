@@ -1,0 +1,435 @@
+# ReMe config for the Tenet-vs-ReMe LongMemEval head-to-head (scripts/bench_reme_h2h.py).
+#
+# Provenance: adapted from reme-ai==0.4.1.1's own bundled LongMemEval eval config
+# (`<reme-venv>/lib/python3.11/site-packages/reme/config/jinli_lme.yaml` — ReMe's
+# own `benchmark/lme/*` job scaffolding: auto_memory ingest, bm25_search/
+# vector_search/search retrieval, plus its own agentic_answer/llm_judge which we
+# do NOT use — see below). Diffed against that file, our only overrides are:
+#   1. as_llm.default.model    -> qwen3.7-plus (was qwen3.7-max)   — matches
+#      Tenet's reader/judge model so "same backbone" actually holds.
+#   2. as_llm.plus.model       -> qwen-flash (was hardcoded qwen3.7-plus) — our
+#      DELIBERATE cost-matched distillation tier (ReMe's own shipped default for
+#      this eval config is qwen3.7-plus for auto_memory extraction, NOT a flash
+#      model — verified by reading this file at reme-ai 0.4.1.1, contradicting
+#      the design doc's assumption that qwen-flash was ReMe's "own recommended
+#      default"; that claim traces to an older reme-ai script default arg that no
+#      longer exists in this version's package layout. qwen-flash here is OUR
+#      choice, matching Tenet's qwen3.6-flash distiller tier for a fair
+#      flash-vs-flash cost comparison per docs_scratch/reme_h2h_setup.md).
+#   3. credential.base_url fallbacks -> the DashScope INTL endpoint (was CN
+#      `dashscope.aliyuncs.com`) so it matches `QWEN_BASE_URL` in
+#      src/tenet/config.py by default, with no extra env vars required.
+#   4. file_store.default.embedding_store -> env-toggled, empty (BM25-only) by
+#      default — ReMe's own out-of-the-box retrieval posture (see default.yaml
+#      in the same package: `embedding_store` is commented out there too). Set
+#      LME_EMBEDDING_STORE=default for the optional vector-retrieval stretch arm
+#      (still text-embedding-v4, so an apples-to-apples embedder vs Tenet/RAG).
+#
+# Everything else (jobs: auto_memory / bm25_search / vector_search / search /
+# version / health_check / ...; workspace layout; agent_wrapper react configs)
+# is verbatim from ReMe's own eval config — this repo does not fork ReMe's
+# ingest/retrieval mechanics, only points them at our shared backbone.
+#
+# Driven as a black box by scripts/bench_reme_h2h.py via `reme start job=...`
+# (service.backend: cli below -> one job, prints its Response.answer, exits).
+# Secrets flow via env vars (never CLI args) — see docs_scratch/reme_h2h_setup.md
+# for the exact env-var mapping from this repo's .env.
+#
+# Validate offline (no network, no LLM call — see docs_scratch/reme_h2h_setup.md
+# "config loads clean" for the exact command and its output):
+#   <reme-venv>/bin/python -c \
+#     "from reme.config import resolve_app_config; \
+#      c = resolve_app_config(config='scripts/reme_h2h_config.yaml'); \
+#      print(c['components']['as_llm']['plus']['model'])"
+
+service:
+  backend: cli
+
+workspace_dir: ${LME_WORKSPACE_DIR:-scratchpad/reme_h2h_workspace/default}
+session_dir: history_session
+resource_dir: session
+daily_dir: daily
+digest_dir: ""
+
+jobs:
+  auto_memory:
+    backend: base
+    description: "Extract every raw session into a search-friendly daily note (one note per session)."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: clear_paths_step   # wipe old daily notes so this is a clean rebuild
+        config_keys: [daily_dir]
+      - backend: lme_auto_memory_step
+        agent_wrapper: lme_memory
+
+  update_index:
+    backend: base
+    watch_dirs: [daily_dir]
+    watch_suffixes: [md]
+    steps:
+      - backend: clear_store_step
+      - backend: init_changes_step
+        monitor_type: file_store
+        monitor_name: default
+        dispatch_steps: [update_index_step]
+
+  extract_session_by_id:
+    backend: base
+    description: "Given a session_id shown in a search result, go back to the original raw session and extract everything in it that is relevant to the current question. Use this when a search hit looks relevant but the distilled note lacks an exact number, date, or wording."
+    parameters:
+      type: object
+      properties:
+        session_id:
+          type: string
+          description: "the session_id from a search result header"
+      required:
+        - session_id
+    steps:
+      - backend: lme_extract_session_step
+        agent_wrapper: lme_extract
+
+  vector_search:
+    backend: base
+    description: "Dense semantic search over the memory notes. Returns each hit with its source note path and session_id."
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "search query"
+      required:
+        - query
+    steps:
+      - backend: vector_search_step
+        include_source: true
+
+  bm25_search:
+    backend: base
+    description: "Keyword (BM25) search over the memory notes. Returns each hit with its source note path and session_id."
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "search query"
+      required:
+        - query
+    steps:
+      - backend: bm25_search_step
+        include_source: true
+
+  agentic_answer:
+    backend: base
+    description: "Answer query.json from indexed memory using vector/bm25 search + session extraction. NOT used by bench_reme_h2h.py — we score ReMe with the SAME qa_answer/qa_judge as every other arm (scripts/lme_recall.py) so the memory system is the only variable. Kept only because removing it would mean forking ReMe's job scaffolding."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: clear_paths_step
+        paths: [mem_answer.json]
+      - backend: lme_agentic_answer_step
+        agent_wrapper: lme_agentic_answer
+
+  llm_judge:
+    backend: base
+    description: "Judge mem_answer.json against answer.json. NOT used by bench_reme_h2h.py — see agentic_answer note above."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: lme_llm_judge_step
+        agent_wrapper: lme_judge
+
+  version:
+    backend: base
+    description: "return reme package version"
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: version_step
+
+  search:
+    backend: base
+    description: "Hybrid workspace search (vector + BM25, RRF-fused). Only meaningful once LME_EMBEDDING_STORE=default is set (the vector-retrieval stretch arm); with the default empty embedding_store this degrades to BM25-only, same as the bm25_search job."
+    parameters:
+      type: object
+      properties:
+        query:
+          type: string
+          description: "search query"
+        start_date:
+          type: string
+          description: "optional inclusive start date filter (YYYY-MM-DD); results earlier than this date are excluded"
+        end_date:
+          type: string
+          description: "optional inclusive end date filter (YYYY-MM-DD); results later than this date are excluded"
+      required:
+        - query
+    steps:
+      - backend: search_step
+        vector_weight: 0.7
+        candidate_multiplier: 5.0
+        expand_links: true
+        max_links_per_direction: 10
+
+  add_draft:
+    backend: base
+    description: "Append text to the current draft list."
+    parameters:
+      type: object
+      properties:
+        text:
+          type: string
+          description: "draft text to append"
+      required:
+        - text
+    steps:
+      - backend: add_draft_step
+
+  read_all_draft:
+    backend: base
+    description: "Read all draft text previously appended in the current tool context."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: read_all_draft_step
+
+  python_execute:
+    backend: base
+    description: "Execute Python code and return printed stdout."
+    parameters:
+      type: object
+      properties:
+        code:
+          type: string
+          description: "Python code to execute. Print the final result to stdout."
+        timeout:
+          type: number
+          description: "Execution timeout in seconds; defaults to 60."
+      required:
+        - code
+    steps:
+      - backend: python_execute_step
+
+  session_review:
+    backend: base
+    description: "Review every session for query/answer-relevant evidence and write session_review.json."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: clear_paths_step
+        paths: [session_review.json]
+      - backend: lme_session_review_step
+        agent_wrapper: lme_review
+
+  golden_check:
+    backend: base
+    description: "Read session_review.json and judge whether the golden answer is reasonable."
+    parameters:
+      type: object
+      properties: { }
+    steps:
+      - backend: clear_paths_step
+        paths: [check_golden.json]
+      - backend: wait_for_paths_step
+        paths: [session_review.json]
+        poll_seconds: 5
+        log_every_seconds: 60
+      - backend: lme_golden_check_step
+        agent_wrapper: lme_judge
+
+components:
+  tokenizer:
+    default:
+      backend: regex
+
+  as_embedding:
+    default:
+      backend: ${EMBEDDING_BACKEND:-openai}
+      model: ${EMBEDDING_MODEL_NAME:-text-embedding-v4}
+      dimensions: 1024
+      credential:
+        api_key: ${EMBEDDING_API_KEY:-}
+        base_url: ${EMBEDDING_BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      parameters: { }
+
+  embedding_store:
+    default:
+      backend: local
+      as_embedding: default
+
+  as_llm:
+    default:
+      # reader + judge tier — must match Tenet/RAG's reader (qwen3.7-plus) so the
+      # memory system, not the backbone, is the only variable (design doc §2.1).
+      backend: ${LLM_BACKEND:-openai}
+      model: ${LLM_MODEL_NAME:-qwen3.7-plus}
+      stream: true
+      context_size: 1000000
+      max_retries: 3
+      credential:
+        api_key: ${LLM_API_KEY:-}
+        base_url: ${LLM_BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      parameters:
+        max_tokens: 65536
+
+    plus:
+      # distillation/extraction tier (auto_memory) — cost-matched flash-class
+      # model, see the file header for why this differs from ReMe's own shipped
+      # default (qwen3.7-plus) for this tier.
+      backend: ${LLM_BACKEND:-openai}
+      model: ${LME_DISTILL_MODEL:-qwen-flash}
+      stream: true
+      context_size: 1000000
+      max_retries: 3
+      credential:
+        api_key: ${LLM_API_KEY:-}
+        base_url: ${LLM_BASE_URL:-https://dashscope-intl.aliyuncs.com/compatible-mode/v1}
+      parameters:
+        max_tokens: 65536
+
+  agent_wrapper:
+    default:
+      backend: agentscope
+      as_llm: default
+      permission_mode: bypass
+      react_config:
+        max_iters: 30
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 50000
+      model_config:
+        max_retries: 3
+
+    agentic_search_agentwrapper:
+      backend: agentscope
+      as_llm: default
+      cwd: session
+      permission_mode: bypass
+      builtin_tools: false
+      job_tools:
+        - search
+        - add_draft
+        - read_all_draft
+        - python_execute
+      sequential_tool_calls: true
+      react_config:
+        max_iters: 100
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+    lme_memory:
+      backend: agentscope
+      as_llm: plus
+      permission_mode: bypass
+      builtin_tools: false
+      react_config:
+        max_iters: 8
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+    lme_extract:
+      backend: agentscope
+      as_llm: plus
+      permission_mode: bypass
+      builtin_tools: false
+      react_config:
+        max_iters: 3
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+    lme_agentic_answer:
+      backend: agentscope
+      as_llm: default
+      cwd: session
+      permission_mode: bypass
+      builtin_tools: false
+      job_tools:
+        - vector_search
+        - bm25_search
+        - python_execute
+        - extract_session_by_id
+      sequential_tool_calls: true
+      react_config:
+        max_iters: 40
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+    lme_review:
+      backend: agentscope
+      as_llm: plus
+      permission_mode: bypass
+      builtin_tools: false
+      react_config:
+        max_iters: 10
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+    lme_judge:
+      backend: agentscope
+      as_llm: default
+      permission_mode: bypass
+      builtin_tools: false
+      job_tools:
+        - python_execute
+      sequential_tool_calls: true
+      react_config:
+        max_iters: 50
+      context_config:
+        trigger_ratio: 0.89
+        reserve_ratio: 0.1
+        tool_result_limit: 1000000
+      model_config:
+        max_retries: 3
+
+  file_graph:
+    default:
+      backend: local
+
+  file_chunker:
+    markdown:
+      backend: markdown
+      supported_extensions: [ "md" ]
+    default:
+      backend: default
+      supported_extensions: [ "json", "jsonl" ]
+      chunk_byte_size: 100000
+
+  keyword_index:
+    default:
+      backend: bm25
+      tokenizer: default
+
+  file_store:
+    default:
+      backend: local
+      store_name: local
+      embedding_store: ${LME_EMBEDDING_STORE:-}
+      keyword_index: default
+      file_graph: default

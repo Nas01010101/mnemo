@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import random
 import re
 import string
@@ -216,10 +217,9 @@ def gen_mab(limit_contexts: int | None = None) -> list[dict]:
 #    Extract facts whose value changes across sessions (same subject::attribute).
 #    LME_S has session timestamps -> wall-clock time features are meaningful.
 # ===========================================================================
-_LME_PATHS = [
-    Path("data/lme/longmemeval_s.json"),
-    Path("/Volumes/PortableSSD/datasets/longmemeval/longmemeval_s.json"),
-]
+_LME_PATHS = [Path("data/lme/longmemeval_s.json")]
+if os.environ.get("TENET_LME_DATA_PATH"):  # override/extra search location, no personal path baked in
+    _LME_PATHS.append(Path(os.environ["TENET_LME_DATA_PATH"]))
 
 
 def _parse_iso(s: str) -> float | None:

@@ -37,7 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 api = ["fastapi>=0.110", "uvicorn>=0.27"]
-mcp = ["mcp>=1.2"]
+mcp = ["mcp>=1.23"]  # floor matches requirements.txt's CVE-clean minimum (raised 2026-07-12)
 oss = ["oss2>=2.18"]
 local = ["sentence-transformers>=3.0"]
 cli = ["rich>=13"]
