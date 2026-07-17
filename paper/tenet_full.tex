@@ -53,6 +53,9 @@ MemoryAgentBench \textsc{FactConsolidation} (ICLR~2026) it scores $86.5\%$ singl
 ($30.2$); on MemoryAgentBench \textsc{Accurate Retrieval} it averages $59.3$, second only
 to HippoRAG-v2 ($65.1$) among published systems while being the only one whose ingestion
 never calls an LLM, and beats the field on EventQA ($70.7$ vs $67.6$; Wilson CI excludes).
+Run head-to-head against a released memory framework as a black box (ReMe, its own
+ingest-and-retrieve pipeline end-to-end, identical reader and judge), \tenet{} scores
+$67.0\%$ vs ReMe's $34.0\%$ on LongMemEval\_S ($n{=}100$, $p\approx2\times10^{-6}$).
 All numbers are reproducible from released code with official metrics and prompts verbatim.
 \end{abstract}
 
@@ -110,7 +113,10 @@ current value, rather than at assembly time, where every read must re-derive it.
   aggregation~\cite{freshness}, a HippoRAG-v2-style OpenIE+PPR graph, and
   MemAgent-style~\cite{memagent} overwrite memory) as arms in the \emph{same} harness with
   the \emph{same} backbone, isolating the memory mechanism as the only variable
-  (\S\ref{sec:baselines}).
+  (\S\ref{sec:baselines})---and run one released system, ReMe~\cite{reme}, fully
+  \emph{black-box} through its own ingest and retrieval pipeline: \tenet{} 67.0\% vs
+  ReMe 34.0\% on LongMemEval\_S $n{=}100$, McNemar $p\approx2\times10^{-6}$
+  (\S\ref{sec:reme}).
 \end{enumerate}
 
 \section{Related work}\label{sec:related}
@@ -549,6 +555,42 @@ at every read. Mem0-style consolidation holds up single-hop (81.0) but collapses
 multi-hop (12.0); the graph arm is limited by 7B-quality OpenIE (66.0/9.0); overwrite
 memory loses information by construction (44.0/16.0).
 
+\subsection{Black-box head-to-head vs.\ ReMe}\label{sec:reme}
+The \S\ref{sec:baselines} arms are our reimplementations; a stronger test is a released
+system run \emph{as shipped}. ReMe~\cite{reme} (reme-ai 0.4.1.1, Alibaba's agent-memory
+framework) exposes a CLI whose \texttt{auto\_memory} job distills each session into
+daily notes and whose \texttt{bm25\_search} job retrieves over them; we drive that
+pipeline end-to-end as a black-box arm (isolated venv, its own config defaults,
+flash-tier distiller) on LongMemEval\_S full haystacks ($n{=}100$ seeded sample,
+$\sim$115K tokens/question), with the identical \texttt{qwen3.7-plus} chain-of-note
+reader and judge for every arm. Within-run comparison only.
+
+\begin{center}
+\small
+\begin{tabular}{lrr}
+\toprule
+arm & accuracy & Wilson 95\%\\
+\midrule
+\tenet{} & \textbf{67.0} & \ci{57.3}{75.4}\\
+matched RAG & 64.0 & \ci{54.2}{72.7}\\
+ReMe (own pipeline) & 34.0 & \ci{25.5}{43.7}\\
+blind & 0.0 & \ci{0.0}{3.7}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+McNemar \tenet{}-vs-ReMe: 41/8 discordant, $p\approx2\times10^{-6}$; \tenet{} leads on
+every question type. \tenet{}-vs-RAG is $+3$pp (11/8, $p{=}0.65$, n.s.\ at this $n$).
+Notably ReMe trails \emph{plain RAG} by 30pp ($p\approx9\times10^{-6}$): lossy
+session-note distillation plus keyword-only retrieval discards detail that chunk
+retrieval keeps---the same failure axis \S\ref{sec:results} measures for \tenet{}'s
+hybrid raw-slice pool, here at full system scale. Fairness notes: we repaired four
+runtime defects in the ReMe deployment (a provider token-cap rejection, a streaming
+hang, a concurrency wedge, and its ingest job never building the index its retrieval
+job reads) that would otherwise have scored it at or near blind level for reasons
+external to its method; the reader has an arm-neutral truncation-repair path. Per-question
+rows and spend (\$2.83 total) ship in the repo.
+
 \subsection{Case study: web-agent trajectory memory (LongMemEval-V2)}\label{sec:lmev2}
 LongMemEval-V2~\cite{lmev2} shifts the setting from chat to \emph{web-agent trajectory}
 histories (up to 115M tokens; DOM states, actions, URLs) and scores a latency--accuracy
@@ -875,6 +917,8 @@ Reasoning and Memory Management. arXiv:2512.12967, 2026.
 Memory Management for LLM Agents. arXiv:2601.01885, ACL 2026.
 \bibitem{actmem} Zhang et al. ActMem: Bridging the Gap Between Memory Retrieval and
 Reasoning in LLM Agents. arXiv:2603.00026, 2026.
+\bibitem{reme} ReMe: Remember Me, a Memory Framework for Agents.
+  \url{https://github.com/agentscope-ai/ReMe}, reme-ai 0.4.1.1, 2026.
 \bibitem{memagent} MemAgent: Reshaping Long-Context LLM with Multi-Conv RL-based Memory
 Agent. arXiv:2507.02259, 2025.
 \bibitem{napmem} NapMem: Memory as a Structured Action Space for Long-Horizon Agents.
