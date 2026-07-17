@@ -28,11 +28,13 @@ found:
 
 **This is Tenet's positioning, not a footnote.** In a field where the headline number is
 routinely inflated 20–60 points, Tenet reports **every** result with Wilson 95% CIs, ships
-**four default-OFF flags that we measured as negative** (`RAW_RECALL`, `AGG_READER`,
-`RETRACT`, `CONSOLIDATE`), and **falsified its own pre-registered churn claim in public**
+**five default-OFF flags that we measured as no-benefit** (`RAW_RECALL`, `AGG_READER`,
+`RETRACT`, `CONSOLIDATE`, `USAGE_RECALL`), and **falsified its own pre-registered churn claim in public**
 (§4.8) before fixing it. We do not claim a cross-protocol LongMemEval win; we claim
 **standardized, apples-to-apples wins** (MemoryAgentBench FactConsolidation **86.5 SH**,
-official SubEM + prompt, *above* the published mini-tier SOTA 78.0; MAB-AR **59.3**, 2nd of
+official SubEM + prompt, *above* the published mini-tier SOTA 78.0 — raw evidence and an
+honestly-flagged discrepancy from a smaller n=40 reproduction: `docs/factcon_results.json`;
+MAB-AR **59.3**, 2nd of
 all published systems) plus a real head-to-head where we control every variable (§A). The
 brand is: **the memory system whose numbers you can actually reproduce.**
 
@@ -241,9 +243,9 @@ the fair comparison.
   weak-reader *efficiency* operating point, not Tenet's accuracy ceiling. See BENCHMARK.md
   §"Reader-generality".
 
-### Improvement follow-ups — three implemented and measured (all kept OFF), one open
-The top three EV follow-ups were built (behind default-off flags) and measured; all are
-**honest negatives**, and the negatives are themselves informative:
+### Improvement follow-ups — four implemented and measured (all kept OFF), one open
+The top four EV follow-ups were built (behind default-off flags) and measured; all are
+**honest negatives or clean nulls**, and they're themselves informative:
 
 1. **CAR-style read-time `max(serial)` aggregation** (`src/tenet/aggregate.py`,
    `TENET_AGG_READER`, default OFF) — **clean null**: FC-MH 15.0 → 15.0 (n=20), LoCoMo
@@ -273,6 +275,24 @@ The top three EV follow-ups were built (behind default-off flags) and measured; 
    budget to itself; Tenet's shared belief+raw pool cannot replicate that structure by
    re-weighting without giving up the evidence that was pulling weight. Deterministically
    correct (5 tests), byte-identical default-OFF path, kept OFF, flagged.
+
+4. **Usage-scenario retrieval** (`MemoryCore.recall(usage_recall=True)`, `TENET_USAGE_RECALL`,
+   default OFF) — ReMe-style (Tongyi Lab, arXiv:2512.10696) recall knob: at distill time, tag
+   each fact with a one-line usage-scenario ("when would this be useful to retrieve", reusing
+   the existing distill() call — no second LLM call), embed it alongside content, and RRF-fuse
+   a scenario-similarity ranking with the existing content ranking at read time. **Clean null**
+   on a small ChurnBench slice (5 principals × 5 facts, U=2/8/32, `qwen3.7-plus` reader,
+   `qwen3.6-flash` distiller, n=25/point, n=75/arm): baseline 100.0/96.0/96.0 (pooled 97.3%,
+   73/75) vs usage_recall=True 100.0/100.0/92.0 (pooled 97.3%, 73/75) — identical pooled
+   accuracy, redistributed by one question each way at U=8/U=32 (noise at this n). *Why:*
+   ChurnBench's paraphrased conversational updates are topically close to the query in BOTH
+   content and usage-scenario space ("the user's residence", "when asked where the user
+   lives") — the two rankings aren't independent signals here, so RRF fusion has nothing to
+   add over content similarity alone. A benchmark where the QUERY describes a *situation*
+   rather than restating fact content (e.g. "what should I cook for a guest" → "user is
+   allergic to shellfish") is a more likely place for this to pay off; not tested here (out of
+   this session's time-box). Deterministically correct (7 tests, `scripts/test_usage_recall.py`),
+   byte-identical default-OFF path, kept OFF, flagged.
 
 Still open (not yet built): **hard-delete for extreme-churn keys** (low priority — we already
 tie Mem0-style and it risks the `as_of` history win). The verbatim-recall gap is now

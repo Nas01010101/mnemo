@@ -212,6 +212,20 @@ is a **local qwen2.5:7b** — a deliberately weak, laptop-class backbone.
 Reproduce: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local \
 python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic`
 
+**Raw evidence artifact**: unlike ChurnBench/Mem0-h2h/LME, this section's numbers had no
+standalone `docs/*.json` artifact until 2026-07-16 — no raw per-question output from the
+original 2026-07-07 run (commit f6a0ac0) was found anywhere in the repo, `docs_scratch/`,
+`experiments/`, or `data/bench_runs.jsonl`. `docs/factcon_results.json` fills that gap, but
+via a BOUNDED reproduction (n=40/axis, `--qpc 10`, not the full n=400/axis above) — a full
+`--qpc 100` re-run was in progress and reached 60/100 on one cell before the background job
+was reclaimed at ~27 min wall-clock (cost was never the constraint: `LLM_PROVIDER=ollama` is
+$0 either way). At n=40, MH pooled (32.5% [20.1,48.0]) is consistent with the 30.2% above;
+SH pooled (70.0% [54.6,81.9]) is LOWER than the 86.5% above, which sits just outside this
+smaller run's CI. Given the small n and that `--qpc` truncates to the first N questions per
+cell (not a random subsample), this is reported as an **unresolved, flagged discrepancy** —
+not a confirmed correction of the headline number, and not silently kept unverified either.
+A full `--qpc 100` re-run (~2-3h wall-clock, still $0) would resolve which number is right.
+
 ### 6.1 Same-harness reproductions of four published methods (`scripts/bench_baselines.py`)
 To remove the backbone confound entirely, we reimplemented four published memory
 mechanisms as arms of the SAME harness — same local-7B reader, same embedder, same
@@ -610,8 +624,9 @@ the same harness:
 
 Consolidation **ties or marginally trails** the default (98 vs 100 at U=8; both CIs overlap
 fully) — hard-archiving raw echoes removes verbatim detail the reader still uses. So the flag
-**ships default-OFF**, joining the honest ledger of measured-negative flags
-(`TENET_RAW_RECALL`, `TENET_AGG_READER`, `TENET_RETRACT`).
+**ships default-OFF**, joining the honest ledger of measured-negative/null flags
+(`TENET_RAW_RECALL`, `TENET_AGG_READER`, `TENET_RETRACT`, `TENET_USAGE_RECALL` —
+see COMPARISON.md's follow-up #4, ReMe-style usage-scenario retrieval, clean null).
 
 **Honest framing — do NOT overclaim this as a churn win over Mem0.** The default arm's U=32
 number is run-dependent: **82%** (§9.1, tenet+1+2) to **98%** (this run, fresh distillation +

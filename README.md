@@ -85,7 +85,7 @@ Full honest matrix + benchmark comparability caveats: [`docs/COMPARISON.md`](doc
 > numbers don't survive reproduction — Mem0 claims 93.4% on LongMemEval but reproduces at
 > [73.8% hosted / 32.4% OSS](docs/COMPARISON.md#-frontier-reality-check--the-2026-reproduction-crisis-verified-2026-07-14);
 > LoCoMo's answer key is 6.4% wrong. Tenet reports **every** number with a Wilson 95% CI,
-> ships **four flags default-OFF because we measured them as no-benefit**, and **falsified
+> ships **five flags default-OFF because we measured them as no-benefit**, and **falsified
 > its own churn claim in public** before fixing it. Built **100% on Qwen Cloud** (no OpenAI
 > in the product path). Every result reproduces from one command.
 
@@ -98,6 +98,11 @@ Full honest matrix + benchmark comparability caveats: [`docs/COMPARISON.md`](doc
 | Knowledge-churn horizon (fact updated 2→12×) | current-value accuracy | **100%** throughout | naive-RAG collapses 100%→50% | [`BENCHMARK.md` §3](docs/BENCHMARK.md#3-long-horizon-knowledge-churn--where-memory-structurally-wins-scriptsbench_horizonpy) |
 | LongMemEval_S (n=100, `qwen3.7-plus` Qwen-Cloud reader) | QA accuracy | **81.0%** | ≥ matched RAG 79.0% · **100%** recall@10 · **98.5% less context** than full | [`BENCHMARK.md` §1–2](docs/BENCHMARK.md#1-retrieval-recall--longmemeval_s-scriptslme_recallpy) |
 | Local LoRA distiller (offline, zero-cloud) | key-consistency, decontaminated | **0.775** | cloud reference (`qwen3.7-plus`) 0.707 | [`BENCHMARK.md` §10](docs/BENCHMARK.md#10-local-distiller-zero-cloud-verdict) |
+
+<sup>FactConsolidation raw evidence: [`docs/factcon_results.json`](docs/factcon_results.json) — a bounded
+n=40/axis reproduction (session wall-clock limited, not $ — see the file's `config.note`) lands MH
+consistent with the 86.5/30.2 pooled claim above but SH lower (70.0% [54.6, 81.9] vs 86.5%); flagged as
+an unresolved discrepancy, not silently corrected or hidden — see the file's `discrepancy_note`.</sup>
 
 Honest weak spots (multi-session synthesis, multi-hop chaining) are reported, not
 hidden — full tables and reproduction commands: [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
@@ -359,6 +364,7 @@ Mem0 18%, MemGPT 28%** single-hop; **≤7%** multi-hop for all 22 systems):
 **Above the published mini-tier single-hop SOTA and tied on multi-hop — with a local 7B
 backbone and *zero-LLM* deterministic ingestion.** SubEM + official prompt verbatim; Wilson
 CIs; no length collapse (SH ≥81% at every haystack size). Details: [`docs/BENCHMARK.md`](docs/BENCHMARK.md) §6.
+Raw evidence + an honest flagged discrepancy from a smaller reproduction: [`docs/factcon_results.json`](docs/factcon_results.json).
 
 **MAB Accurate-Retrieval** (~2,000 questions over 197K–534K-token contexts, official
 per-benchmark metrics, matched gpt-4o-mini reader): AR average **59.3** — second only to
