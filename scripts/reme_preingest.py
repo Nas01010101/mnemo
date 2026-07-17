@@ -37,10 +37,15 @@ def ingest_one(inst: dict, *, reme_bin: str, config: str, root: Path, env: dict,
                timeout: int) -> tuple[str, float, str]:
     ws = reme_write_workspace(inst, root)
     marker = ws / ".ingested"
-    if marker.exists():
+    # Marker is only trusted when notes exist — auto_memory reports success
+    # even at 0 notes written (see reme_h2h_driver for the same guard).
+    has_notes = any((ws / "daily").rglob("*.md")) if (ws / "daily").is_dir() else False
+    if marker.exists() and has_notes:
         return inst["question_id"], 0.0, "cached"
     t0 = time.time()
     reme_run_job(reme_bin, config, "auto_memory", ws, env, timeout=timeout)
+    if not any((ws / "daily").rglob("*.md")):
+        raise RuntimeError("auto_memory wrote no notes")
     marker.touch()
     return inst["question_id"], time.time() - t0, "ok"
 

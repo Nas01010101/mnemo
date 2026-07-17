@@ -379,9 +379,12 @@ def run(args) -> None:
                 try:
                     d = json.loads(line)
                     # qa_error rows are transient API failures with NO arm
-                    # results — leaving them in `done` would drop the question
-                    # from the study forever on every resume. Re-run them.
-                    if not d.get("qa_error"):
+                    # results; reme_error rows have every arm EXCEPT reme.
+                    # Leaving either in `done` would exclude those questions
+                    # (or that arm) forever on every resume — and if failures
+                    # correlate with harder questions, that biases the reme
+                    # arm downward. Re-run both.
+                    if not d.get("qa_error") and not d.get("reme_error"):
                         done.add(d["qid"])
                 except (json.JSONDecodeError, KeyError):
                     continue

@@ -76,11 +76,19 @@ def reme_ingest_and_search(inst: dict, *, reme_bin: str, reme_config: str,
         return script.pop(0) if script else "[dry-run] reme context stub"
     ws = reme_write_workspace(inst, workspace_root)
     marker = ws / ".ingested"
-    if not marker.exists():
+    # The marker alone isn't proof of a usable ingest: auto_memory reports
+    # success even when every extraction failed and 0 notes were written,
+    # which would silently score the reme arm at blind level. Trust the
+    # marker only when notes actually exist; otherwise self-heal by
+    # re-ingesting (covers markers touched by older preingest code too).
+    has_notes = any((ws / "daily").rglob("*.md")) if (ws / "daily").is_dir() else False
+    if not marker.exists() or not has_notes:
         # auto_memory = one LLM call per haystack session (~50/question) — the
         # slow step. scripts/reme_preingest.py runs it in parallel ahead of the
         # bench; the marker makes ingest idempotent across the two entry points.
         reme_run_job(reme_bin, reme_config, "auto_memory", ws, env)
+        if not any((ws / "daily").rglob("*.md")):
+            raise RuntimeError(f"auto_memory wrote no notes for {inst['question_id']}")
         marker.touch()
     # bm25_search reads the file_store keyword index, which auto_memory does
     # NOT build — update_index does (clear+rebuild over daily notes, local-only,
