@@ -1,0 +1,193 @@
+{
+ "benchmark": "LongMemEval_S (full-haystack, ~115k tokens/question)",
+ "n": 100,
+ "config": {
+  "reader": "qwen3.7-plus (Chain-of-Note, truncation-repair path)",
+  "judge": "qwen3.7-plus",
+  "tenet_distill": "qwen3.6-flash",
+  "reme_distill": "qwen-flash",
+  "reme": "reme-ai 0.4.1.1, own auto_memory ingest + update_index + bm25_search, isolated venv",
+  "embedder_rag_tenet": "text-embedding-v4",
+  "k": 8,
+  "seed": 0,
+  "reproduce": "python scripts/bench_reme_h2h.py --n 100 --arms blind,rag,reme,tenet --reme-venv scratchpad/reme-venv --workspace-root docs_scratch/reme_ws --budget-cap 10 --out docs_scratch/reme_h2h_n100.jsonl (pre-ingest first via scripts/reme_preingest.py)"
+ },
+ "arms": {
+  "blind": {
+   "acc": 0.0,
+   "correct": 0,
+   "n": 100,
+   "wilson95": [
+    0.0,
+    0.037
+   ]
+  },
+  "rag": {
+   "acc": 0.64,
+   "correct": 64,
+   "n": 100,
+   "wilson95": [
+    0.5424,
+    0.7273
+   ]
+  },
+  "reme": {
+   "acc": 0.34,
+   "correct": 34,
+   "n": 100,
+   "wilson95": [
+    0.2546,
+    0.4372
+   ]
+  },
+  "tenet": {
+   "acc": 0.67,
+   "correct": 67,
+   "n": 100,
+   "wilson95": [
+    0.5731,
+    0.7544
+   ]
+  }
+ },
+ "per_type": {
+  "knowledge-update": {
+   "blind": {
+    "correct": 0,
+    "n": 13
+   },
+   "rag": {
+    "correct": 11,
+    "n": 13
+   },
+   "reme": {
+    "correct": 3,
+    "n": 13
+   },
+   "tenet": {
+    "correct": 10,
+    "n": 13
+   }
+  },
+  "multi-session": {
+   "blind": {
+    "correct": 0,
+    "n": 27
+   },
+   "rag": {
+    "correct": 10,
+    "n": 27
+   },
+   "reme": {
+    "correct": 9,
+    "n": 27
+   },
+   "tenet": {
+    "correct": 14,
+    "n": 27
+   }
+  },
+  "single-session-assistant": {
+   "blind": {
+    "correct": 0,
+    "n": 13
+   },
+   "rag": {
+    "correct": 13,
+    "n": 13
+   },
+   "reme": {
+    "correct": 5,
+    "n": 13
+   },
+   "tenet": {
+    "correct": 12,
+    "n": 13
+   }
+  },
+  "single-session-preference": {
+   "blind": {
+    "correct": 0,
+    "n": 8
+   },
+   "rag": {
+    "correct": 6,
+    "n": 8
+   },
+   "reme": {
+    "correct": 4,
+    "n": 8
+   },
+   "tenet": {
+    "correct": 5,
+    "n": 8
+   }
+  },
+  "single-session-user": {
+   "blind": {
+    "correct": 0,
+    "n": 11
+   },
+   "rag": {
+    "correct": 11,
+    "n": 11
+   },
+   "reme": {
+    "correct": 8,
+    "n": 11
+   },
+   "tenet": {
+    "correct": 10,
+    "n": 11
+   }
+  },
+  "temporal-reasoning": {
+   "blind": {
+    "correct": 0,
+    "n": 28
+   },
+   "rag": {
+    "correct": 13,
+    "n": 28
+   },
+   "reme": {
+    "correct": 5,
+    "n": 28
+   },
+   "tenet": {
+    "correct": 16,
+    "n": 28
+   }
+  }
+ },
+ "mcnemar": {
+  "tenet_vs_reme": {
+   "tenet_only": 41,
+   "reme_only": 8,
+   "p": 1.9646537765538596e-06
+  },
+  "tenet_vs_rag": {
+   "tenet_only": 11,
+   "rag_only": 8,
+   "p": 0.6476058959960938
+  },
+  "reme_vs_rag": {
+   "reme_only": 8,
+   "rag_only": 38,
+   "p": 9.24769992138863e-06
+  }
+ },
+ "spend_usd": {
+  "blind": 0.006,
+  "rag": 0.06,
+  "reme": 1.488,
+  "tenet": 1.277,
+  "total": 2.831
+ },
+ "provenance": {
+  "date": "2026-07-17",
+  "wall_s": 6377,
+  "rows": "docs_scratch/reme_h2h_n100.jsonl",
+  "note": "reme arm is ReMe's own pipeline end-to-end (auto_memory session notes -> keyword index -> bm25_search) with fixes required to run at all: max_tokens<=32768 for qwen-flash, stream:false, concurrency 8, update_index before retrieval (auto_memory never builds the bm25 index). All arms share the same reader/judge; reader truncation-repair is arm-neutral."
+ }
+}

@@ -98,6 +98,7 @@ Full honest matrix + benchmark comparability caveats: [`docs/COMPARISON.md`](doc
 | Knowledge-churn horizon (fact updated 2→12×) | current-value accuracy | **100%** throughout | naive-RAG collapses 100%→50% | [`BENCHMARK.md` §3](docs/BENCHMARK.md#3-long-horizon-knowledge-churn--where-memory-structurally-wins-scriptsbench_horizonpy) |
 | LongMemEval_S (n=100, `qwen3.7-plus` Qwen-Cloud reader) | QA accuracy | **81.0%** | ≥ matched RAG 79.0% · **100%** recall@10 · **98.5% less context** than full | [`BENCHMARK.md` §1–2](docs/BENCHMARK.md#1-retrieval-recall--longmemeval_s-scriptslme_recallpy) |
 | Local LoRA distiller (offline, zero-cloud) | key-consistency, decontaminated | **0.775** | cloud reference (`qwen3.7-plus`) 0.707 | [`BENCHMARK.md` §10](docs/BENCHMARK.md#10-local-distiller-zero-cloud-verdict) |
+| Head-to-head vs **ReMe** (Alibaba's memory framework), LongMemEval_S n=100 | QA accuracy, same reader/judge | **67.0%** [57.3, 75.4] | ReMe (own `auto_memory`+BM25 pipeline) 34.0% · matched RAG 64.0% · blind 0.0% — McNemar tenet-vs-ReMe p≈2×10⁻⁶ | [`reme_h2h_results.json`](docs/reme_h2h_results.json) |
 
 <sup>FactConsolidation raw evidence: [`docs/factcon_results.json`](docs/factcon_results.json) — a full
 n=100/cell (n=800) reproduction (2026-07-17, $0: local reader + embeddings + zero-LLM keys) matches the
@@ -105,6 +106,16 @@ published numbers on every cell within 1pt: SH pooled 86.5 [82.8, 89.5] exactly,
 An earlier bounded n=40 spot-check had flagged SH as an unresolved discrepancy; that was sampling noise.
 The file also carries a reading-mode ablation (official-prompt reading: SH 66.8 / MH 7.5 — same memory,
 same reader model; the documented `--tenet-read decompose` is what the claim requires).</sup>
+
+<sup>ReMe head-to-head (2026-07-17, [`docs/reme_h2h_results.json`](docs/reme_h2h_results.json)): both
+memory systems ingest the same full ~115k-token haystacks with flash-tier distillers and answer through
+the identical `qwen3.7-plus` reader+judge — a within-run comparison (absolute numbers aren't comparable
+to the §1–2 row, which uses a different protocol). ReMe runs its own released pipeline end-to-end
+(`auto_memory` session notes → `update_index` → `bm25_search`, reme-ai 0.4.1.1 in an isolated venv);
+we fixed four of its runtime defects to get it running fairly (documented in the artifact). Tenet
+beats ReMe on every question type; tenet-vs-RAG is +3pp (not significant at n=100). ReMe below
+matched RAG (p≈9×10⁻⁶) is ReMe's result, not our tuning: lossy note distillation + keyword-only
+retrieval discards detail that plain chunk retrieval keeps.</sup>
 
 Honest weak spots (multi-session synthesis, multi-hop chaining) are reported, not
 hidden — full tables and reproduction commands: [`docs/BENCHMARK.md`](docs/BENCHMARK.md).
