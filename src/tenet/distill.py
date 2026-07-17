@@ -18,7 +18,7 @@ from . import config
 _MODEL = config.get("QWEN_DISTILL_MODEL", "qwen3.6-flash")
 
 _SYS = """You extract durable, atomic facts from a message for an agent's long-term memory.
-Return STRICT JSON: {"facts": [{"statement","key","salience","valid_at","action"}...]}.
+Return STRICT JSON: {"facts": [{"statement","key","salience","valid_at","action","scenario"}...]}.
 
 Rules:
 - action: "remember" (default — a fact to store, may supersede an older value) or
@@ -53,6 +53,11 @@ Rules:
 - salience: 0.0-1.0. Durable/identity/preference/commitment facts are high (0.7-1.0);
   transient small talk is low (0.0-0.3). Skip pure chit-chat entirely.
 - valid_at: an ISO-8601 date/time if the fact states when it becomes true, else null.
+- scenario: a ONE-LINE description of WHEN this fact would be useful to retrieve — the
+  situation or kind of question a future query would look like, NOT a restatement of the
+  fact itself. Keep it under 15 words. E.g. "I'm allergic to peanuts" ->
+  "when recommending food, restaurants, or ingredients"; "my flight is AA123 on the 5th" ->
+  "when discussing travel plans or airport pickup".
 - Extract nothing (empty list) if there is no durable fact worth remembering.
 Return ONLY the JSON object."""
 
@@ -64,6 +69,7 @@ class Fact:
     salience: float
     valid_at_iso: str | None
     action: str = "remember"  # "remember" | "retract" (docs/COMPARISON.md follow-up #3)
+    scenario: str = ""  # usage-scenario tag (ReMe-style, arXiv:2512.10696) — see usage_recall.py
 
 
 def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
@@ -101,5 +107,7 @@ def distill(text: str, *, model: str = _MODEL, client=None) -> list[Fact]:
         action = str(f.get("action") or "remember").strip().lower()
         if action != "retract":
             action = "remember"  # unrecognized/missing -> the safe default
-        out.append(Fact(stmt, key, max(0.0, min(1.0, sal)), f.get("valid_at") or None, action))
+        scenario = str(f.get("scenario") or "").strip()
+        out.append(Fact(stmt, key, max(0.0, min(1.0, sal)), f.get("valid_at") or None,
+                         action, scenario))
     return out

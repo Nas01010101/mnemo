@@ -51,6 +51,8 @@ jobs:
         run: python scripts/test_mem0_api.py
       - name: ChurnBench generator + scorer tests (deterministic, no LLM)
         run: python scripts/test_churnbench.py
+      - name: usage-scenario retrieval tests (deterministic, distill stubbed, no LLM)
+        run: python scripts/test_usage_recall.py
 
   install-smoke:
     runs-on: ubuntu-latest
