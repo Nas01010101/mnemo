@@ -134,6 +134,11 @@ half-life), not a full close of the gap (`docs/BENCHMARK.md` §9–9.1).
 - **MAB Accurate-Retrieval: 59.3 average, 2nd of all published systems** (20+ points
   above Mem0/Zep/MemGPT), and beats the field outright on EventQA (70.7 vs 67.6).
 - Best accuracy-per-token on LongMemEval_S (49.2 vs RAG's 27.4 per 1k tokens).
+- **Beats ReMe — Alibaba's own agent-memory framework — head-to-head, 67% vs 34%** on
+  LongMemEval_S n=100, running ReMe's released pipeline end-to-end as a black box
+  (its own `auto_memory` ingest + BM25 retrieval) with the identical Qwen reader/judge
+  for every arm; McNemar p ≈ 2×10⁻⁶, Tenet ahead on every question type
+  (`docs/BENCHMARK.md` §15).
 - We report the honest losses too: multi-session synthesis and multi-hop chaining are
   documented weak spots, not hidden — every number reproduces from one CLI command
   (`tenet bench run <name>`, `docs/BENCHMARK.md`).

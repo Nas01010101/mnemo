@@ -62,6 +62,10 @@ attribute), **RAG collapses 100%→50% while Tenet holds 100%** — while on the
 Tenet from worst-arm to 98/92/82 at U=2/8/32, with delete-outright consolidation still
 leading at extreme churn (`docs/BENCHMARK.md` §9). On
 LongMemEval_S Tenet has the best accuracy-per-token (49.2 vs RAG 27.4 per 1k tokens).
+And in a direct head-to-head against **ReMe — Alibaba's own agent-memory framework, run
+as a black box through its own released pipeline** — Tenet scores **67% vs ReMe's 34%**
+on LongMemEval_S n=100 (same Qwen reader/judge for every arm, McNemar p ≈ 2×10⁻⁶,
+Tenet ahead on every question type; `docs/BENCHMARK.md` §15).
 Honest weak spots — multi-session synthesis and multi-hop chaining — are reported, not
 hidden. Every number reproduces from one documented command: `docs/BENCHMARK.md`.
 

@@ -984,6 +984,47 @@ EMBED_PROVIDER=local python scripts/bench_churn.py --principals 6 --updates 2,8,
 --distractor-sessions 4 --arms tenet,rag,mem0,hipporag --consistency-threshold 0.70
 --currency-context`. Same-harness method reproductions: `scripts/bench_baselines.py` (§6.1).
 
+## 15. Head-to-head vs ReMe — Alibaba's own memory framework (measured 2026-07-17)
+
+**Why this one matters for a Qwen hackathon:** ReMe (reme-ai, from Alibaba's agentscope
+ecosystem) is the memory framework closest to home for the judges. We ran it as a
+**black-box arm of our harness** — its own released pipeline end-to-end (`auto_memory`
+session-note ingest → `update_index` → `bm25_search` retrieval, reme-ai 0.4.1.1 in an
+isolated venv, driven via its CLI backend), NOT our reimplementation of it.
+
+**Protocol.** LongMemEval_S, n=100 (seeded sample, `_abs` questions excluded), full
+~115k-token haystacks. Both memory systems ingest with flash-tier distillers (Tenet:
+`qwen3.6-flash`; ReMe: `qwen-flash` — its own config default); all four arms answer
+through the identical `qwen3.7-plus` Chain-of-Note reader and judge. Within-run
+comparison only — absolutes are not comparable to §1–2 (different protocol).
+
+| arm | accuracy | Wilson 95% |
+|---|---:|---|
+| **Tenet** | **67.0%** | [57.3, 75.4] |
+| matched RAG (same chunks, same embedder) | 64.0% | [54.2, 72.7] |
+| **ReMe** (own pipeline) | 34.0% | [25.5, 43.7] |
+| blind (no memory) | 0.0% | [0.0, 3.7] |
+
+McNemar (paired): Tenet-vs-ReMe 41/8, **p ≈ 2×10⁻⁶**. Tenet-vs-RAG +3pp (11/8, p=0.65 —
+not significant at n=100). ReMe-vs-RAG **−30pp** (8/38, p ≈ 9×10⁻⁶). Tenet leads ReMe on
+**every question type** (per-type grid in the artifact). Blind at 0/100 confirms no
+question is answerable without memory.
+
+**Honest notes.** (1) ReMe's deficit vs plain RAG is ReMe's own result, not our tuning:
+lossy session-note distillation + keyword-only BM25 retrieval discards detail that chunk
+retrieval keeps. (2) We fixed four runtime defects in the ReMe setup to get it running
+*fairly* (qwen-flash 32k max_tokens cap, streaming hang, concurrency wedge, and its
+`auto_memory` job never building the BM25 index that `bm25_search` reads — each would
+have scored ReMe at blind level or 0 through no fault of its method). (3) The reader has
+a truncation-repair path (arm-neutral, fires only when Chain-of-Note deliberation misses
+the `ANSWER:` marker). Evidence: [`reme_h2h_results.json`](reme_h2h_results.json) +
+per-question rows [`reme_h2h_rows.jsonl`](reme_h2h_rows.jsonl); spend $2.83 total.
+
+Reproduce: `python scripts/reme_preingest.py --n 100 --reme-venv <venv> --workspace-root
+<ws> --workers 3` then `python scripts/bench_reme_h2h.py --n 100 --arms blind,rag,reme,tenet
+--reme-venv <venv> --workspace-root <ws> --budget-cap 10 --out <rows.jsonl>` (CI smoke:
+suite 17 runs the dry-run path).
+
 ## Reproduce
 
 Every benchmark is wired into the CLI as `tenet bench` — one command per number, with
