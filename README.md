@@ -112,7 +112,9 @@ memory systems ingest the same full ~115k-token haystacks with flash-tier distil
 the identical `qwen3.7-plus` reader+judge — a within-run comparison (absolute numbers aren't comparable
 to the §1–2 row, which uses a different protocol). ReMe runs its own released pipeline end-to-end
 (`auto_memory` session notes → `update_index` → `bm25_search`, reme-ai 0.4.1.1 in an isolated venv);
-we fixed four of its runtime defects to get it running fairly (documented in the artifact). Tenet
+we fixed four of its runtime defects to get it running fairly (documented in the artifact), and a
+supplementary run of ReMe's own answering agent as-shipped (vector+BM25 ReAct loop) scores a
+statistically indistinguishable 36.7% (p=0.75) — the gap is not a protocol artifact. Tenet
 beats ReMe on every question type; tenet-vs-RAG is +3pp (not significant at n=100). ReMe below
 matched RAG (p≈9×10⁻⁶) is ReMe's result, not our tuning: lossy note distillation + keyword-only
 retrieval discards detail that plain chunk retrieval keeps.</sup>
