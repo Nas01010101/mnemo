@@ -65,7 +65,7 @@ design. Recall@10 = 97.5%. Efficiency point = 52.5% at half the tokens (best acc
 ## Where Tenet sits
 - **Architecturally closest to Zep/Graphiti** (bi-temporal + supersession + MCP + no-LLM
   reads) but **lighter**: no knowledge graph. Mem0 *removed* its graph after finding it
-  ran 3× slower / 2× tokens for a thin gain, so Tenet's vector+bi-temporal substrate is a
+  costs ~1.8× p95 latency for a ~2% quality gain (their own report), so Tenet's vector+bi-temporal substrate is a
   deliberate, evidence-backed choice.
 - **Zep-without-the-graph-DB.** Zep/Graphiti needs a graph database (Neo4j / FalkorDB / Kuzu)
   running to get bi-temporal correctness; Tenet gets the same temporal correctness from

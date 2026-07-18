@@ -122,7 +122,7 @@ current value, rather than at assembly time, where every read must re-derive it.
 \section{Related work}\label{sec:related}
 \textbf{Retrieval memory.} Mem0~\cite{mem0} distills salient facts at write time over a
 vector store with entity links; it attaches only a \emph{creation} timestamp and notably
-removed its graph variant after finding it $3\times$ slower for a thin gain---evidence we
+prices its own graph variant at ${\sim}1.8\times$ p95 latency for a ${\sim}2\%$ quality gain---evidence we
 take seriously in choosing a light vector substrate. LongMemEval~\cite{longmemeval} is the
 standard long-horizon benchmark; its V2~\cite{lmev2} adds a latency-aware metric,
 signalling a field shift toward accuracy \emph{per cost}, which our per-token results
@@ -790,7 +790,7 @@ immunity is by construction, not tuning.
 explicit graph traversal; a keyed belief state has no edges to walk. Multi-session
 synthesis needs evidence from several sessions at once; expansion only deepens sessions
 already surfaced. Both are retrieval-topology limits, not consistency limits---graph-free
-was a deliberate trade (Mem0's own ablation found graphs $3\times$ slower for thin gains),
+was a deliberate trade (Mem0's own report prices its graph variant at ${\sim}1.8\times$ p95 latency for ${\sim}2\%$ gain),
 and the gap quantifies what that trade costs.
 
 \textbf{Cost asymmetry.} Among published systems above 50 on AR, \tenet{} is the only one

@@ -86,7 +86,7 @@ take toward perception [Friston]; we bring it to agent memory.
 
 **Retrieval memory.** Mem0 [Chhikara 2025] distills salient facts at write time over a
 vector store with entity links; it attaches only a *creation* timestamp and, notably,
-*removed* its graph variant after finding it 3× slower / 2× tokens for a thin gain —
+prices its own graph variant at ~1.8× p95 latency for a ~2% quality gain —
 evidence we take seriously in choosing a light vector substrate. LongMemEval [Wu 2024]
 is the standard long-horizon benchmark; its V2 [Wu 2026] adds a *latency-aware* metric,
 signalling a field shift toward accuracy *per cost*, which our per-token results target.
