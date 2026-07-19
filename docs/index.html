@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tenet — Bi-temporal memory for agents that live in time</title>
+<meta name="description" content="Tenet is a bi-temporal memory system for LLM agents built on the Qwen stack: supersession-aware, time-travel queries, benchmark-verified.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Ctext x='16' y='23' font-size='20' font-weight='650' font-family='system-ui' fill='white' text-anchor='middle'%3Et%3C/text%3E%3C/svg%3E">
+<style>
+:root {
+  color-scheme: light;
+  --bg:#f9f9f7; --surface:#fcfcfb; --fg:#0b0b0b; --muted:#52514e; --faint:#898781;
+  --border:#e1e0d9; --hairline:rgba(11,11,11,0.10); --baseline:#c3c2b7;
+  --accent:#2a78d6; --accent-ink:#1c5cab;
+  --s-tenet:#2a78d6; --s-rag:#008300; --s-reme:#d55181; --s-blind:#c98500;
+  --good:#006300; --warn:#b97f00; --bad:#d03b3b;
+  --code-bg:#f0efec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg:#0d0d0d; --surface:#1a1a19; --fg:#ffffff; --muted:#c3c2b7; --faint:#898781;
+    --border:#2c2c2a; --hairline:rgba(255,255,255,0.10); --baseline:#383835;
+    --accent:#3987e5; --accent-ink:#6da7ec;
+    --s-tenet:#3987e5; --s-rag:#008300; --s-reme:#d55181; --s-blind:#c98500;
+    --good:#0ca30c; --warn:#fab219; --bad:#e66767;
+    --code-bg:#232322;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#0d0d0d; --surface:#1a1a19; --fg:#ffffff; --muted:#c3c2b7; --faint:#898781;
+  --border:#2c2c2a; --hairline:rgba(255,255,255,0.10); --baseline:#383835;
+  --accent:#3987e5; --accent-ink:#6da7ec;
+  --s-tenet:#3987e5; --s-rag:#008300; --s-reme:#d55181; --s-blind:#c98500;
+  --good:#0ca30c; --warn:#fab219; --bad:#e66767;
+  --code-bg:#232322;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { scroll-behavior:smooth; scroll-padding-top:72px; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior:auto; } * { transition:none !important; animation:none !important; } }
+body {
+  background:var(--bg); color:var(--fg);
+  font:400 16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3 { font-weight:650; line-height:1.2; letter-spacing:-0.02em; }
+a { color:var(--accent-ink); text-decoration:none; }
+a:hover { text-decoration:underline; }
+code,pre { font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:0.86em; }
+code { background:var(--code-bg); padding:2px 5px; border-radius:4px; }
+pre { background:var(--code-bg); border:1px solid var(--border); border-radius:8px; padding:16px; overflow-x:auto; line-height:1.55; }
+pre code { background:none; padding:0; }
+.wrap { max-width:920px; margin:0 auto; padding:0 24px; }
+section { padding:64px 0; border-top:1px solid var(--border); }
+.kicker { font-size:13px; font-weight:650; letter-spacing:0.08em; text-transform:uppercase; color:var(--accent-ink); margin-bottom:12px; }
+h2 { font-size:clamp(24px,4vw,32px); margin-bottom:16px; }
+h3 { font-size:20px; margin:32px 0 12px; }
+p.lede { font-size:18px; color:var(--muted); max-width:65ch; }
+section p { max-width:65ch; color:var(--muted); margin-bottom:12px; }
+section p strong { color:var(--fg); }
+
+/* nav */
+nav {
+  position:sticky; top:0; z-index:50; background:color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter:blur(10px); border-bottom:1px solid var(--border);
+}
+nav .wrap { display:flex; align-items:center; gap:24px; height:56px; }
+.wordmark { font-weight:650; font-size:17px; letter-spacing:0.01em; color:var(--fg); }
+.wordmark span { color:var(--accent-ink); }
+nav .links { display:flex; gap:20px; margin-left:auto; font-size:14px; }
+nav .links a { color:var(--muted); }
+nav .links a:hover { color:var(--fg); text-decoration:none; }
+#themeBtn { background:none; border:1px solid var(--border); border-radius:8px; color:var(--muted); width:32px; height:32px; cursor:pointer; font-size:14px; }
+#themeBtn:hover { color:var(--fg); border-color:var(--faint); }
+@media (max-width:720px) { nav .links a.hideS { display:none; } }
+
+/* hero */
+header.hero { padding:88px 0 56px; }
+header.hero h1 { font-size:clamp(36px,6vw,58px); max-width:17ch; margin-bottom:20px; }
+.cta { display:flex; gap:12px; flex-wrap:wrap; margin-top:28px; }
+.btn {
+  display:inline-block; padding:10px 20px; border-radius:8px; font-size:15px; font-weight:650;
+  border:1px solid var(--border); color:var(--fg); transition:background 150ms ease-out;
+}
+.btn:hover { text-decoration:none; background:var(--surface); }
+.btn.primary { background:var(--fg); color:var(--bg); border-color:var(--fg); }
+.btn.primary:hover { opacity:0.85; }
+
+/* stat tiles */
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:48px; }
+.tile { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; }
+.tile .v { font-size:32px; font-weight:650; letter-spacing:-0.02em; }
+.tile .v small { font-size:16px; color:var(--faint); font-weight:400; }
+.tile .k { font-size:13px; color:var(--muted); margin-top:6px; line-height:1.45; }
+
+/* fact anatomy */
+.fact {
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:20px 24px; margin:24px 0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
+  font-size:13.5px; line-height:2; overflow-x:auto;
+}
+.fact b { font-weight:650; }
+.fact .dim { color:var(--faint); }
+.fact .hl { color:var(--accent-ink); }
+
+/* playground */
+.playground { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-top:24px; }
+.pg-grid { display:grid; grid-template-columns:minmax(260px,5fr) minmax(300px,7fr); gap:24px; }
+@media (max-width:860px) { .pg-grid { grid-template-columns:1fr; } }
+.pg-h { font-size:13px; font-weight:650; letter-spacing:0.06em; text-transform:uppercase; color:var(--faint); margin-bottom:12px; }
+.stream { display:flex; flex-direction:column; gap:8px; }
+.mem {
+  border:1px solid var(--border); border-radius:8px; padding:10px 12px; font-size:13.5px;
+  color:var(--faint); background:var(--bg); transition:border-color 200ms ease-out, color 200ms ease-out;
+}
+.mem .md { font-size:12px; }
+.mem.in { color:var(--fg); border-color:var(--accent); }
+.mem.in .md { color:var(--accent-ink); }
+.mem .tag { display:inline-block; font-size:11px; font-weight:650; border-radius:4px; padding:0 6px; margin-left:6px; color:var(--bg); }
+.pg-btns { display:flex; gap:8px; margin-top:16px; flex-wrap:wrap; }
+button.act {
+  padding:8px 16px; border-radius:8px; border:1px solid var(--border); background:var(--fg);
+  color:var(--bg); font:650 14px/1.4 system-ui,sans-serif; cursor:pointer;
+}
+button.act:hover:not(:disabled) { opacity:0.85; }
+button.act:disabled { opacity:0.35; cursor:default; }
+button.act.ghost { background:none; color:var(--muted); }
+button.act.ghost:hover:not(:disabled) { opacity:1; color:var(--fg); background:var(--bg); }
+.board { display:flex; flex-direction:column; gap:10px; }
+.bk { border:1px solid var(--border); border-radius:8px; padding:12px 14px; background:var(--bg); }
+.bk .key { font:650 13px/1.4 ui-monospace,Menlo,monospace; color:var(--faint); }
+.bk .val { font-size:16px; font-weight:650; margin-top:2px; min-height:24px; }
+.bk .val .none { color:var(--faint); font-weight:400; font-style:italic; }
+.bk .chain { font-size:12.5px; color:var(--faint); margin-top:4px; }
+.bk .chain s { opacity:0.8; }
+.qpanel { margin-top:20px; border-top:1px solid var(--border); padding-top:20px; }
+.qrow { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-bottom:12px; }
+.qrow select {
+  background:var(--bg); color:var(--fg); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; font:400 14px/1.4 system-ui,sans-serif;
+}
+.qrow input[type=range] { flex:1; min-width:160px; accent-color:var(--accent); }
+.qdate { font:650 14px/1.4 ui-monospace,Menlo,monospace; min-width:104px; text-align:right; }
+.answer {
+  border-left:3px solid var(--accent); background:var(--bg); border-radius:0 8px 8px 0;
+  padding:12px 16px; font-size:15px; min-height:52px;
+}
+.answer .why { display:block; font-size:13px; color:var(--faint); margin-top:4px; }
+.pg-note { font-size:13px; color:var(--faint); margin-top:16px; max-width:none; }
+
+/* charts */
+.chartcard { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-top:24px; }
+.chartcard .cc-head { display:flex; align-items:baseline; gap:16px; flex-wrap:wrap; margin-bottom:4px; }
+.chartcard h4 { font-size:16px; font-weight:650; }
+.chartcard .cc-sub { font-size:13px; color:var(--faint); }
+.seg { display:inline-flex; border:1px solid var(--border); border-radius:8px; overflow:hidden; margin-left:auto; }
+.seg button { background:none; border:none; padding:6px 14px; font:650 13px/1.4 system-ui,sans-serif; color:var(--muted); cursor:pointer; }
+.seg button[aria-pressed="true"] { background:var(--fg); color:var(--bg); }
+.legend { display:flex; gap:16px; font-size:13px; color:var(--muted); margin:8px 0 4px; flex-wrap:wrap; }
+.legend .sw { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:6px; vertical-align:baseline; }
+.chart svg { display:block; width:100%; height:auto; }
+.chart text { font:400 12px/1 system-ui,sans-serif; fill:var(--faint); }
+.chart .dlab { font-weight:650; fill:var(--fg); }
+.chart .grid { stroke:var(--border); stroke-width:1; }
+.chart .axis { stroke:var(--baseline); stroke-width:1; }
+#tt {
+  position:fixed; z-index:99; pointer-events:none; display:none; max-width:280px;
+  background:var(--fg); color:var(--bg); border-radius:8px; padding:8px 12px;
+  font-size:12.5px; line-height:1.5; box-shadow:0 4px 16px rgba(0,0,0,0.25);
+}
+
+/* tables */
+table { border-collapse:collapse; width:100%; font-size:14.5px; margin-top:16px; }
+th,td { text-align:left; padding:9px 12px; border-bottom:1px solid var(--border); }
+th { font-weight:650; font-size:13px; color:var(--muted); }
+td.num,th.num { text-align:right; font-variant-numeric:tabular-nums; }
+tr.hl td { background:var(--surface); }
+.tscroll { overflow-x:auto; }
+
+/* pipeline */
+.pipe { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin-top:24px; }
+.step { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; }
+.step .n { font-size:12px; font-weight:650; color:var(--accent-ink); letter-spacing:0.06em; }
+.step .t { font-weight:650; margin:4px 0 6px; }
+.step p { font-size:13.5px; margin:0; }
+
+.honest { border-left:3px solid var(--warn); padding:4px 0 4px 20px; margin-top:24px; }
+.honest p { margin-bottom:8px; }
+footer { border-top:1px solid var(--border); padding:48px 0 64px; font-size:14px; color:var(--faint); }
+footer .wrap { display:flex; justify-content:space-between; gap:24px; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="wordmark" href="#top">tenet<span>.</span></a>
+    <div class="links">
+      <a href="#playground">Playground</a>
+      <a href="#benchmarks" class="hideS">Benchmarks</a>
+      <a href="#h2h" class="hideS">Head-to-head</a>
+      <a href="#how" class="hideS">How it works</a>
+      <a href="https://github.com/Nas01010101/tenet">GitHub</a>
+      <button id="themeBtn" aria-label="Toggle color theme">◐</button>
+    </div>
+  </div>
+</nav>
+
+<header class="hero wrap" id="top">
+  <div class="kicker">Qwen Cloud Hackathon · Track 1 — Memory</div>
+  <h1>Memory that knows when facts change.</h1>
+  <p class="lede">Tenet is a <strong>bi-temporal</strong> memory system for LLM agents, built end-to-end on the
+  Qwen stack. Every fact carries two clocks — when it became true, and when the agent learned it — so
+  updates <em>supersede</em> instead of accumulate, and queries can time-travel: <em>“where did I live in March?”</em>
+  gets March’s answer, not a lucky retrieval.</p>
+  <div class="cta">
+    <a class="btn primary" href="#playground">Try the time-travel playground</a>
+    <a class="btn" href="https://github.com/Nas01010101/tenet">GitHub</a>
+    <a class="btn" href="https://github.com/Nas01010101/tenet/blob/main/paper/tenet_full.pdf">Paper (PDF)</a>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="v">86.5 <small>SubEM</small></div><div class="k">MemoryAgentBench FactConsolidation single-hop — published mini-tier SOTA is 78.0, naive-RAG 47.8</div></div>
+    <div class="tile"><div class="v">100%</div><div class="k">current-value accuracy after 12 fact updates — naive-RAG collapses to 50%</div></div>
+    <div class="tile"><div class="v">67 <small>vs 34</small></div><div class="k">head-to-head vs ReMe (Alibaba’s memory framework) on LongMemEval_S, same reader &amp; judge, p≈2×10⁻⁶</div></div>
+    <div class="tile"><div class="v">−98.5%</div><div class="k">context handed to the reader vs full history, at 100% recall@10</div></div>
+  </div>
+</header>
+
+<section class="wrap" id="idea">
+  <div class="kicker">The idea</div>
+  <h2>Two clocks per fact</h2>
+  <p>Vector stores treat memory as a pile of text: every stale version of a fact stays retrievable
+  forever, and the reader has to guess which one is current. Tenet stores <strong>facts, not chunks</strong> —
+  each keyed, versioned, and stamped on two independent time axes:</p>
+  <div class="fact">
+<b>key</b>        user::city<br>
+<b>value</b>      "Berlin"<br>
+<b>t_event</b>    <span class="hl">2025-05-05</span>   <span class="dim">← when it became true in the world</span><br>
+<b>t_ingest</b>   <span class="hl">2025-04-22</span>   <span class="dim">← when the agent learned it</span><br>
+<b>supersedes</b> user::city = "Lisbon" <span class="dim">(2025-01-10 → 2025-05-05)</span>
+  </div>
+  <p>That one structural decision buys three behaviors no flat store has: <strong>supersession</strong>
+  (a new value closes the old one — exactly one current value per fact, no matter how many times it
+  changed), <strong>time-travel</strong> (answer as-of any date on either axis), and
+  <strong>principled forgetting</strong> (closed versions can be aged out without touching current knowledge).</p>
+</section>
+
+<section class="wrap" id="playground">
+  <div class="kicker">Interactive</div>
+  <h2>The time-travel playground</h2>
+  <p>A real Tenet board in miniature. Ingest the conversation stream one memory at a time and watch facts
+  supersede each other — then drag the question date and see the answer change. Note memory&nbsp;4 arrives
+  <em>late</em> (learned in June about a change from March) and memory&nbsp;6 is a <em>correction</em> — only a
+  two-clock store handles either without corrupting history.</p>
+
+  <div class="playground">
+    <div class="pg-grid">
+      <div>
+        <div class="pg-h">Conversation stream</div>
+        <div class="stream" id="stream"></div>
+        <div class="pg-btns">
+          <button class="act" id="ingestBtn">Ingest next</button>
+          <button class="act ghost" id="resetBtn">Reset</button>
+        </div>
+      </div>
+      <div>
+        <div class="pg-h">Belief board — what the agent knows now</div>
+        <div class="board" id="board"></div>
+        <div class="qpanel">
+          <div class="pg-h">Ask the memory</div>
+          <div class="qrow">
+            <select id="qsel" aria-label="Question">
+              <option value="user::city">Where does the user live?</option>
+              <option value="user::employer">Who employs the user?</option>
+              <option value="user::diet">What is the user’s diet?</option>
+            </select>
+          </div>
+          <div class="qrow">
+            <label for="qdate" style="font-size:13px;color:var(--faint)">as&nbsp;of</label>
+            <input type="range" id="qdate" min="0" max="364" value="364">
+            <div class="qdate" id="qdateLab">2025-12-31</div>
+          </div>
+          <div class="answer" id="answer" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+    <p class="pg-note">This widget runs the same as-of resolution rule as the real store
+    (<code>latest t_event ≤ query date, among versions already ingested</code>) — zero API keys, zero network.
+    The full system does this over thousands of facts with Qwen-powered distillation and recall.</p>
+  </div>
+</section>
+
+<section class="wrap" id="benchmarks">
+  <div class="kicker">Evidence</div>
+  <h2>Benchmarks, reproduced — not vibes</h2>
+  <p>Everything below ships with raw per-question evidence artifacts and one-command repro lines in
+  <a href="https://github.com/Nas01010101/tenet/blob/main/docs/BENCHMARK.md">BENCHMARK.md</a>.
+  Scoring is the benchmarks’ own official metrics, verbatim.</p>
+
+  <div class="chartcard">
+    <div class="cc-head">
+      <div>
+        <h4>MemoryAgentBench · FactConsolidation</h4>
+        <div class="cc-sub">SubEM (official scoring), n=100 per cell, local reader — published single-hop mini-tier SOTA: 78.0</div>
+      </div>
+      <div class="seg" role="group" aria-label="Hop mode">
+        <button id="shBtn" aria-pressed="true">Single-hop</button>
+        <button id="mhBtn" aria-pressed="false">Multi-hop</button>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-tenet)"></span>Tenet</span>
+      <span><span class="sw" style="background:var(--s-rag)"></span>naive-RAG (same backbone)</span>
+    </div>
+    <div class="chart" id="fcChart"></div>
+  </div>
+
+  <div class="chartcard">
+    <div class="cc-head">
+      <div>
+        <h4>Knowledge churn — a fact updated N times</h4>
+        <div class="cc-sub">current-value accuracy, k=6 retrieval budget, 15 distractors, 12 principals per point</div>
+      </div>
+    </div>
+    <div class="legend">
+      <span><span class="sw" style="background:var(--s-tenet)"></span>Tenet</span>
+      <span><span class="sw" style="background:var(--s-rag)"></span>naive-RAG</span>
+    </div>
+    <div class="chart" id="churnChart"></div>
+    <p style="font-size:13.5px;margin-top:8px">Once stale versions outnumber the retrieval budget, RAG’s top-k
+    can’t hold them all and the reader picks an old value. Supersession keeps exactly one current value —
+    <strong>RAG loses 50 points; Tenet loses 0.</strong> This is the long-horizon regime memory exists for.</p>
+  </div>
+
+  <h3>Reader-generality — accuracy tracks the reader, memory stays ahead</h3>
+  <p>On LongMemEval_S with retrieval already saturated (recall@10 = 97.5–100%), Tenet ≥ matched RAG under
+  every reader tested — including Qwen Cloud’s own product stack:</p>
+  <div class="tscroll"><table>
+    <tr><th>reader</th><th class="num">n</th><th class="num">RAG</th><th class="num">Tenet</th></tr>
+    <tr class="hl"><td><code>qwen3.7-plus</code> (Qwen Cloud, product stack)</td><td class="num">100</td><td class="num">79.0</td><td class="num"><strong>81.0</strong></td></tr>
+    <tr><td>gpt-5.5</td><td class="num">40</td><td class="num">75.0</td><td class="num"><strong>77.5</strong></td></tr>
+    <tr><td>Gemini-3.5-flash</td><td class="num">40</td><td class="num">70.0</td><td class="num"><strong>75.0</strong></td></tr>
+    <tr><td>gpt-4o (weak-reader efficiency point)</td><td class="num">40</td><td class="num">57.5</td><td class="num">57.5</td></tr>
+  </table></div>
+</section>
+
+<section class="wrap" id="h2h">
+  <div class="kicker">Head-to-head</div>
+  <h2>Same haystacks, same reader, same judge — vs ReMe</h2>
+  <p>We ran Alibaba’s released memory framework <strong>ReMe</strong> (reme-ai 0.4.1.1) end-to-end on its own
+  pipeline — <code>auto_memory</code> session notes → <code>update_index</code> → BM25 — against Tenet on
+  LongMemEval_S (n=100, ~115k-token haystacks per question). Identical <code>qwen3.7-plus</code> reader and judge
+  for every arm; we fixed four ReMe runtime defects to make the comparison fair, and documented each one.</p>
+
+  <div class="chartcard">
+    <div class="cc-head">
+      <div>
+        <h4>QA accuracy, LongMemEval_S n=100</h4>
+        <div class="cc-sub">whiskers are Wilson 95% CIs · McNemar Tenet-vs-ReMe p≈2×10⁻⁶ · Tenet-vs-RAG +3pp (n.s.)</div>
+      </div>
+    </div>
+    <div class="chart" id="h2hChart"></div>
+    <p style="font-size:13.5px;margin-top:8px">A supplementary arm running <strong>ReMe’s own answering agent
+    as-shipped</strong> (vector+BM25 ReAct loop) scores 37.0% — statistically indistinguishable from its main-protocol
+    34.0% (p=0.55). The gap is ReMe’s result, not a protocol artifact: lossy note distillation plus keyword
+    retrieval discards detail that plain chunk retrieval keeps. Tenet beats ReMe on <em>every</em> question type.</p>
+  </div>
+</section>
+
+<section class="wrap" id="how">
+  <div class="kicker">System</div>
+  <h2>How it works — all Qwen, end to end</h2>
+  <p>The shipped product runs entirely on Qwen Cloud: <code>qwen3.6-flash</code> distills, <code>text-embedding-v4</code>
+  embeds, <code>qwen3.7-plus</code> reads. A local-only mode (Ollama + bge-small + LoRA-distilled
+  <code>qwen2.5</code>) reproduces the FactConsolidation headline at $0.</p>
+  <div class="pipe">
+    <div class="step"><div class="n">01 · DISTILL</div><div class="t">Conversation → facts</div>
+      <p>Sessions are distilled into keyed, dated fact assertions — not chunks. A local LoRA distiller
+      beats the cloud reference on key-consistency (0.775 vs 0.707).</p></div>
+    <div class="step"><div class="n">02 · STORE</div><div class="t">Bi-temporal board</div>
+      <p>Each assertion lands with (t_event, t_ingest). A new value for a key closes the old version —
+      supersession is a first-class write, not a hope.</p></div>
+    <div class="step"><div class="n">03 · RECALL</div><div class="t">As-of retrieval</div>
+      <p>Queries resolve against the board as of any date on either clock; retrieval hands the reader
+      98.5% less context at 100% recall@10.</p></div>
+    <div class="step"><div class="n">04 · READ</div><div class="t">Answer + cite</div>
+      <p>A Chain-of-Note reader answers from the recalled facts — with a bounded repair path so long
+      deliberation never truncates into garbage.</p></div>
+  </div>
+
+  <div class="honest">
+    <h3 style="margin-top:0">What we don’t claim</h3>
+    <p>Multi-hop consolidation is honestly hard: 30.0 pooled SubEM (vs RAG’s 4.5) — better than the field,
+    far from solved. Multi-session synthesis is a reported weak spot. Every negative result, ablation null,
+    and run-invalidating bug we found is documented in the paper and benchmark log — the audit trail is
+    part of the submission.</p>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <strong style="color:var(--fg)">Tenet</strong> · Qwen Cloud Hackathon 2026, Track 1<br>
+      Reproduce: <code>python scripts/bench_factcon.py --qpc 100 --tenet-read decompose</code>
+    </div>
+    <div style="text-align:right">
+      <a href="https://github.com/Nas01010101/tenet">GitHub</a> ·
+      <a href="https://github.com/Nas01010101/tenet/blob/main/docs/BENCHMARK.md">Benchmark log</a> ·
+      <a href="https://github.com/Nas01010101/tenet/blob/main/paper/tenet_full.pdf">Paper</a>
+    </div>
+  </div>
+</footer>
+
+<div id="tt" role="tooltip"></div>
+
+<script>
+"use strict";
+/* ---------- theme ---------- */
+const themeBtn = document.getElementById("themeBtn");
+themeBtn.addEventListener("click", () => {
+  const r = document.documentElement;
+  const dark = getComputedStyle(document.body).backgroundColor !== "rgb(249, 249, 247)";
+  r.setAttribute("data-theme", dark ? "light" : "dark");
+});
+
+/* ---------- tooltip ---------- */
+const tt = document.getElementById("tt");
+function showTT(html, x, y) {
+  tt.innerHTML = html; tt.style.display = "block";
+  const w = tt.offsetWidth, pad = 14;
+  let left = x + pad; if (left + w > innerWidth - 8) left = x - w - pad;
+  tt.style.left = left + "px"; tt.style.top = Math.max(8, y - 10) + "px";
+}
+function hideTT() { tt.style.display = "none"; }
+
+/* ---------- playground ---------- */
+const MEMS = [
+  { d:"2025-01-10", txt:"“Just moved to Lisbon — the light here is unreal.”",
+    key:"user::city", val:"Lisbon", ev:"2025-01-10" },
+  { d:"2025-02-03", txt:"“Started as a data engineer at Meridian Labs.”",
+    key:"user::employer", val:"Meridian Labs", ev:"2025-02-03" },
+  { d:"2025-04-22", txt:"“Big news: relocating to Berlin next week for the new role.”",
+    key:"user::city", val:"Berlin", ev:"2025-04-29", tag:"supersedes", tc:"var(--accent)" },
+  { d:"2025-06-15", txt:"“I went fully vegetarian back in March, by the way.”",
+    key:"user::diet", val:"vegetarian", ev:"2025-03-20", tag:"learned late", tc:"var(--warn)" },
+  { d:"2025-09-05", txt:"“Left Meridian — I’m now leading infra at Halcyon.”",
+    key:"user::employer", val:"Halcyon", ev:"2025-09-01", tag:"supersedes", tc:"var(--accent)" },
+  { d:"2025-11-12", txt:"“Correction: the Berlin move actually happened May 5th, not April.”",
+    correction:{ idx:2, ev:"2025-05-05" }, tag:"correction", tc:"var(--bad)" },
+];
+const KEYS = ["user::city","user::employer","user::diet"];
+const QTXT = { "user::city":"lives in", "user::employer":"works at", "user::diet":"eats" };
+let nIngested = 0;
+
+const streamEl = document.getElementById("stream");
+MEMS.forEach((m,i) => {
+  const div = document.createElement("div");
+  div.className = "mem"; div.id = "mem"+i;
+  div.innerHTML = `<span class="md">${m.d}</span>${m.tag?`<span class="tag" style="background:${m.tc}">${m.tag}</span>`:""}<br>${m.txt}`;
+  streamEl.appendChild(div);
+});
+
+function facts() {
+  // effective fact versions given ingestion progress (corrections rewrite event time)
+  const out = [];
+  for (let i=0;i<nIngested;i++) {
+    const m = MEMS[i];
+    if (m.correction) {
+      const t = out.find(f => f.src === m.correction.idx);
+      if (t) { t.ev = m.correction.ev; t.corrected = true; }
+    } else out.push({ src:i, key:m.key, val:m.val, ev:m.ev, ingest:m.d });
+  }
+  return out;
+}
+function fmtDate(dayIdx) {
+  const d = new Date(Date.UTC(2025,0,1) + dayIdx*86400000);
+  return d.toISOString().slice(0,10);
+}
+function renderBoard() {
+  const fs = facts(), boardEl = document.getElementById("board");
+  boardEl.innerHTML = "";
+  KEYS.forEach(k => {
+    const versions = fs.filter(f => f.key===k).sort((a,b)=>a.ev<b.ev?-1:1);
+    const cur = versions[versions.length-1];
+    const chain = versions.length>1
+      ? versions.slice(0,-1).map(v=>`<s>${v.val}</s> (${v.ev} → superseded)`).join(" · ")
+      : (cur ? `since ${cur.ev}${cur.corrected?" · event date corrected":""}` : "");
+    boardEl.insertAdjacentHTML("beforeend", `<div class="bk">
+      <div class="key">${k}</div>
+      <div class="val">${cur?cur.val:'<span class="none">nothing on record</span>'}</div>
+      ${chain?`<div class="chain">${chain}</div>`:""}</div>`);
+  });
+}
+function renderAnswer() {
+  const k = document.getElementById("qsel").value;
+  const day = +document.getElementById("qdate").value;
+  const qd = fmtDate(day);
+  document.getElementById("qdateLab").textContent = qd;
+  const versions = facts().filter(f => f.key===k && f.ev<=qd).sort((a,b)=>a.ev<b.ev?-1:1);
+  const cur = versions[versions.length-1];
+  const el = document.getElementById("answer");
+  if (!cur) {
+    el.innerHTML = `I don’t know — nothing on record for <code>${k}</code> as of ${qd}.
+      <span class="why">${nIngested===0?"Ingest some memories first.":"Either not yet true then, or not yet learned."}</span>`;
+    return;
+  }
+  const sup = versions.length>1 ? ` It superseded <s>${versions[versions.length-2].val}</s>.` : "";
+  el.innerHTML = `As of <strong>${qd}</strong>, the user ${QTXT[k]} <strong>${cur.val}</strong>.
+    <span class="why">Version valid since ${cur.ev}, learned ${cur.ingest}.${sup}</span>`;
+}
+function renderPG() {
+  MEMS.forEach((m,i)=>document.getElementById("mem"+i).classList.toggle("in", i<nIngested));
+  document.getElementById("ingestBtn").disabled = nIngested>=MEMS.length;
+  renderBoard(); renderAnswer();
+}
+document.getElementById("ingestBtn").addEventListener("click", ()=>{ nIngested=Math.min(MEMS.length,nIngested+1); renderPG(); });
+document.getElementById("resetBtn").addEventListener("click", ()=>{ nIngested=0; renderPG(); });
+document.getElementById("qsel").addEventListener("change", renderAnswer);
+document.getElementById("qdate").addEventListener("input", renderAnswer);
+renderPG();
+
+/* ---------- chart helpers ---------- */
+function cssVar(n){ return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function frame(mount, W, H){
+  mount.innerHTML = "";
+  const svg = el("svg", { viewBox:`0 0 ${W} ${H}`, role:"img" }, mount);
+  return svg;
+}
+
+/* line chart: FactConsolidation + churn */
+function lineChart(mountId, xs, series, opts){
+  const W=720, H=300, m={t:26,r:16,b:34,l:40};
+  const svg = frame(document.getElementById(mountId), W, H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b;
+  const X = i => m.l + iw*(i/(xs.length-1));
+  const Y = v => m.t + ih*(1 - v/100);
+  for (let g=0; g<=100; g+=25){
+    el("line",{x1:m.l,x2:W-m.r,y1:Y(g),y2:Y(g),class:"grid"},svg);
+    el("text",{x:m.l-8,y:Y(g)+4,"text-anchor":"end"},svg).textContent=g;
+  }
+  el("line",{x1:m.l,x2:W-m.r,y1:Y(0),y2:Y(0),class:"axis"},svg);
+  xs.forEach((x,i)=>{ el("text",{x:X(i),y:H-10,"text-anchor":"middle"},svg).textContent=x; });
+  series.forEach(s=>{
+    const col = cssVar(s.colorVar);
+    el("path",{d:s.data.map((v,i)=>(i?"L":"M")+X(i)+" "+Y(v.v)).join(" "),
+      fill:"none",stroke:col,"stroke-width":2.5,"stroke-linecap":"round"},svg);
+    s.data.forEach((v,i)=>{
+      el("circle",{cx:X(i),cy:Y(v.v),r:4.5,fill:col,stroke:cssVar("--surface"),"stroke-width":2},svg);
+      const hit = el("circle",{cx:X(i),cy:Y(v.v),r:14,fill:"transparent"},svg);
+      hit.addEventListener("mousemove",e=>showTT(
+        `<strong>${s.name}</strong> · ${opts.xName} ${xs[i]}<br>${opts.metric} ${v.v.toFixed(1)}${v.ci?`<br>95% CI [${v.ci[0]}, ${v.ci[1]}]`:""}`,
+        e.clientX,e.clientY));
+      hit.addEventListener("mouseleave",hideTT);
+    });
+    const last = s.data[s.data.length-1];
+    el("text",{x:X(xs.length-1)+0,y:Y(last.v)+(s.labelDy||-10),"text-anchor":"end",class:"dlab"},svg)
+      .textContent=`${s.name} ${last.v.toFixed(0)}`;
+  });
+}
+
+const FC = {
+  sh: { xs:["6k","32k","64k","262k"],
+    tenet:[{v:88,ci:[80.2,93.0]},{v:92,ci:[85.0,95.9]},{v:85,ci:[76.7,90.7]},{v:81,ci:[72.2,87.5]}],
+    rag:[{v:37,ci:[28.2,46.8]},{v:51,ci:[41.3,60.6]},{v:53,ci:[43.3,62.5]},{v:54,ci:[44.3,63.4]}] },
+  mh: { xs:["6k","32k","64k","262k"],
+    tenet:[{v:41,ci:[31.9,50.8]},{v:30,ci:[21.9,39.6]},{v:29,ci:[21.0,38.5]},{v:20,ci:[13.3,28.9]}],
+    rag:[{v:5,ci:[2.2,11.2]},{v:3,ci:[1.0,8.5]},{v:3,ci:[1.0,8.5]},{v:7,ci:[3.4,13.7]}] },
+};
+let fcMode = "sh";
+function drawFC(){
+  const d = FC[fcMode];
+  lineChart("fcChart", d.xs, [
+    { name:"Tenet", colorVar:"--s-tenet", data:d.tenet, labelDy:-10 },
+    { name:"naive-RAG", colorVar:"--s-rag", data:d.rag, labelDy:18 },
+  ], { xName:"context", metric:"SubEM" });
+}
+document.getElementById("shBtn").addEventListener("click",()=>{fcMode="sh";syncSeg();drawFC();});
+document.getElementById("mhBtn").addEventListener("click",()=>{fcMode="mh";syncSeg();drawFC();});
+function syncSeg(){
+  document.getElementById("shBtn").setAttribute("aria-pressed", fcMode==="sh");
+  document.getElementById("mhBtn").setAttribute("aria-pressed", fcMode==="mh");
+}
+
+function drawChurn(){
+  lineChart("churnChart", ["2","4","6","8","10","12"], [
+    { name:"Tenet", colorVar:"--s-tenet", data:[100,100,100,100,100,100].map(v=>({v})), labelDy:-10 },
+    { name:"naive-RAG", colorVar:"--s-rag", data:[100,100,100,67,58,50].map(v=>({v})), labelDy:18 },
+  ], { xName:"updates", metric:"accuracy" });
+}
+
+/* h2h bar chart with CI whiskers */
+const H2H = [
+  { name:"Tenet", v:67, ci:[57.3,75.4], colorVar:"--s-tenet", note:"bi-temporal board + as-of recall" },
+  { name:"matched RAG", v:64, ci:[54.2,72.7], colorVar:"--s-rag", note:"same chunks, plain top-k" },
+  { name:"ReMe agentic*", v:37, ci:[28.2,46.8], colorVar:"--s-reme", note:"ReMe’s own ReAct answerer, as-shipped" },
+  { name:"ReMe", v:34, ci:[25.5,43.7], colorVar:"--s-reme", note:"auto_memory → update_index → BM25" },
+  { name:"blind", v:0, ci:[0,3.7], colorVar:"--s-blind", note:"no memory: floor is truly 0" },
+];
+function drawH2H(){
+  const W=720, H=280, m={t:12,r:16,b:30,l:110};
+  const svg = frame(document.getElementById("h2hChart"), W, H);
+  const iw=W-m.l-m.r, ih=H-m.t-m.b, bh=(ih/H2H.length);
+  const X = v => m.l + iw*(v/100);
+  for (let g=0; g<=100; g+=25){
+    el("line",{x1:X(g),x2:X(g),y1:m.t,y2:H-m.b,class:"grid"},svg);
+    el("text",{x:X(g),y:H-8,"text-anchor":"middle"},svg).textContent=g+"%";
+  }
+  H2H.forEach((b,i)=>{
+    const y = m.t + i*bh + bh*0.18, h = bh*0.58, col=cssVar(b.colorVar);
+    el("text",{x:m.l-10,y:y+h/2+4,"text-anchor":"end",class:"dlab"},svg).textContent=b.name;
+    const rect = el("rect",{x:X(0),y,width:Math.max(2,X(b.v)-X(0)),height:h,rx:4,fill:col},svg);
+    el("line",{x1:X(b.ci[0]),x2:X(b.ci[1]),y1:y+h/2,y2:y+h/2,stroke:cssVar("--fg"),"stroke-width":1.5,opacity:0.65},svg);
+    [b.ci[0],b.ci[1]].forEach(c=>el("line",{x1:X(c),x2:X(c),y1:y+h/2-5,y2:y+h/2+5,stroke:cssVar("--fg"),"stroke-width":1.5,opacity:0.65},svg));
+    el("text",{x:X(Math.max(b.v,8))+8,y:y+h/2+4,class:"dlab"},svg).textContent=b.v.toFixed(0)+"%";
+    rect.addEventListener("mousemove",e=>showTT(
+      `<strong>${b.name}</strong> — ${b.v}% (${Math.round(b.v)}/100)<br>Wilson 95% [${b.ci[0]}, ${b.ci[1]}]<br>${b.note}`,
+      e.clientX,e.clientY));
+    rect.addEventListener("mouseleave",hideTT);
+  });
+  el("line",{x1:m.l,x2:m.l,y1:m.t,y2:H-m.b,class:"axis"},svg);
+}
+
+function drawAll(){ drawFC(); drawChurn(); drawH2H(); }
+drawAll();
+new MutationObserver(drawAll).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+if (matchMedia) matchMedia("(prefers-color-scheme: dark)").addEventListener("change", drawAll);
+</script>
+</body>
+</html>
