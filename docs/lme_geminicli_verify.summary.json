@@ -1,0 +1,50 @@
+{
+ "protocol": {
+  "n": 40,
+  "seed": 0,
+  "k": 10,
+  "expand": 0,
+  "reader": "Gemini 3.5 Flash (High) via agy CLI, un-batched, one call per item",
+  "judge": "qwen3.7-plus",
+  "embedder": "bge-small (local)",
+  "distiller": "qwen3.6-flash"
+ },
+ "agy": {
+  "calls": 62,
+  "retries": 0
+ },
+ "rag": {
+  "correct": 27,
+  "n": 40,
+  "acc": 67.5,
+  "wilson95": [
+   52.0,
+   79.9
+  ],
+  "per_type": {
+   "knowledge-update": "5/7",
+   "multi-session": "5/8",
+   "single-session-assistant": "6/6",
+   "single-session-preference": "0/1",
+   "single-session-user": "5/5",
+   "temporal-reasoning": "6/13"
+  }
+ },
+ "tenet": {
+  "correct": 29,
+  "n": 40,
+  "acc": 72.5,
+  "wilson95": [
+   57.2,
+   83.9
+  ],
+  "per_type": {
+   "knowledge-update": "7/7",
+   "multi-session": "4/8",
+   "single-session-assistant": "5/6",
+   "single-session-preference": "0/1",
+   "single-session-user": "5/5",
+   "temporal-reasoning": "8/13"
+  }
+ }
+}

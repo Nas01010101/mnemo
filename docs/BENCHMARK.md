@@ -113,6 +113,18 @@ not treated as load-bearing. Artifacts: `docs/lme_multireader_results.json`,
 `docs/lme_unbatched_*.jsonl`. See [`METHODOLOGY.md`](METHODOLOGY.md) Defect 8 (now
 resolved by re-measurement).
 
+**Independent scripted verification of the Gemini row (2026-07-19).** The Gemini
+un-batched row was re-run end-to-end through a single scripted pipeline
+(`scripts/lme_reader_gemini_cli.py`: same n=40 seed=0 k=10 instances, same local
+embedder + qwen distiller ingestion, reader routed one-call-per-item through the
+Gemini CLI, judge held on `qwen3.7-plus`; 62 reader calls, 0 retries, 0 exclusions).
+Result: RAG **67.5** [52.0, 79.9] vs Tenet efficiency **72.5** [57.2, 83.9] — the
+**+5.0pp Tenet–RAG gap reproduces exactly**; each arm moved by one question absolute
+vs the recorded row (27 vs 28, 29 vs 30 correct), i.e. reader stochasticity at n=40,
+not a protocol effect. Knowledge-update went 7/7 for Tenet vs 5/7 RAG; temporal
+reasoning 8/13 vs 6/13. Artifacts: `docs/lme_geminicli_verify.jsonl`,
+`docs/lme_geminicli_verify.summary.json`.
+
 **Definitive on-Qwen result (n=100, `qwen3.7-plus` reader, fully Qwen Cloud, 2026-07-12).**
 The load-bearing LongMemEval number: run entirely on the shipped product stack (Qwen Cloud
 embedder + reader over REST — no local model, no off-Qwen reader), n=100, parity operating
