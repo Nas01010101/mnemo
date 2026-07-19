@@ -61,11 +61,16 @@ attribute), **RAG collapses 100%→50% while Tenet holds 100%** — while on the
 *paraphrased* multi-attribute ChurnBench a read-time consistency fix (now default-on) lifts
 Tenet from worst-arm to 98/92/82 at U=2/8/32, with delete-outright consolidation still
 leading at extreme churn (`docs/BENCHMARK.md` §9). On
-LongMemEval_S Tenet has the best accuracy-per-token (49.2 vs RAG 27.4 per 1k tokens).
+LongMemEval_S Tenet has the best accuracy-per-token (49.2 vs RAG 27.4 per 1k tokens),
+and on Qwen Cloud's own product reader (`qwen3.7-plus`, n=100) reaches **81.0% vs matched
+RAG's 79.0%** at 100% recall@10 and 98.5% less context than full history — winning the
+multi-session (75.0 vs 54.2) and temporal-reasoning (80.0 vs 73.3) categories.
 And in a direct head-to-head against **ReMe — Alibaba's own agent-memory framework, run
 as a black box through its own released pipeline** — Tenet scores **67% vs ReMe's 34%**
 on LongMemEval_S n=100 (same Qwen reader/judge for every arm, McNemar p ≈ 2×10⁻⁶,
-Tenet ahead on every question type; `docs/BENCHMARK.md` §15).
+Tenet ahead on every question type; a supplementary arm running ReMe's own answering
+agent as-shipped lands at a statistically indistinguishable 37.0%, p=0.55 — the gap is
+not a protocol artifact; `docs/BENCHMARK.md` §15).
 Honest weak spots — multi-session synthesis and multi-hop chaining — are reported, not
 hidden. Every number reproduces from one documented command: `docs/BENCHMARK.md`.
 
