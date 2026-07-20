@@ -25,7 +25,7 @@
 
 *当你的事实改变时依然正确的智能体记忆——而且读取从不消耗一次 LLM 调用。*
 
-**[English README](README.md)** · 本翻译由 Anthropic 的 Claude（Fable 5）完成，并使用开源机器翻译系统
+**[English README](README.md)** · 本翻译经开源机器翻译系统
 [Argos Translate](https://github.com/argosopentech/argos-translate)（LibreTranslate 所用引擎）
 回译交叉校验；所有数字与技术术语均与英文原版逐一核对。以英文版为准。
 
@@ -493,8 +493,7 @@ MIT —— 见 [LICENSE](LICENSE)。
 
 ---
 
-<sub>翻译说明：本文件为 [README.md](README.md) 的简体中文翻译，由 Anthropic 的大语言模型
-Claude（Fable 5）翻译，并用开源神经机器翻译系统
+<sub>翻译说明：本文件为 [README.md](README.md) 的简体中文机器翻译，并用开源神经机器翻译系统
 [Argos Translate](https://github.com/argosopentech/argos-translate)（OpenNMT/CTranslate2 栈，
 LibreTranslate 的翻译引擎）做 zh→en 回译交叉校验；全部数字、模型名与命令经脚本逐一
 与英文原版比对（见 `scripts/check_translation.py`）。若与英文版有出入，以英文版为准。</sub>
