@@ -111,7 +111,13 @@ class RecallReq(BaseModel):
 @app.get("/")
 def index():
     """The belief-state demo page — single static file, no build step."""
-    return FileResponse(_STATIC_DIR / "index.html")
+    # Serve inline so the demo renders in the browser; FileResponse otherwise
+    # defaults to Content-Disposition: attachment, which forces a download.
+    return FileResponse(
+        _STATIC_DIR / "index.html",
+        media_type="text/html",
+        content_disposition_type="inline",
+    )
 
 
 @app.get("/health")
