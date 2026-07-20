@@ -1,95 +1,104 @@
-# 3-minute demo video script
+# Tenet — 3-minute demo video script
 
-Goal: show Tenet *doing the hard things* (supersession, forgetting, time-travel, MCP),
-not just "it stores text". Record screen + voice; upload public to YouTube.
+Built from what actually wins Devpost AI hackathons (judges watch the video first, back-to-back,
+and score requirements + storytelling): **lead with a problem the judge feels, show the product
+working within ~90s, make the invisible mechanism visible, address every rubric axis in one line,
+and never let the demo stall.** Screen + voice recording, uploaded **public** to YouTube, marked
+**"Not for Kids"**. Keep it under 3:00 — judges aren't required to watch past it.
 
-**0:00 – 0:20 — Hook / problem**
-> "LLM agents forget between sessions, and most memory tools just append and retrieve.
-> The hard parts are facts that *change*, forgetting what's *stale*, and recalling under
-> a small context window. That's Tenet."
-
-**0:20 – 0:50 — Supersession (the money shot)**
-Terminal, run the e2e test or a live snippet:
-```python
-m.ingest("Hi, I'm Alex, I live in Montreal and I'm vegetarian.")
-m.ingest("Update: I moved to Toronto. Also my manager is now Sarah Chen.")
-m.recall("where does the user live and who manages them?")
-```
-> "Watch — I told it Montreal, then Toronto. It doesn't keep both. The old value is
-> *superseded* — retired to history — so it answers Toronto, only. Same for the manager."
-Show `stats()`: current=3, superseded=2.
-
-**0:50 – 1:15 — Time-travel + forgetting**
-```python
-m.recall("where did the user live?", as_of=<before the move>)   # → Montreal
-m.forget_sweep()                                                 # stale low-value archived
-```
-> "History isn't lost — I can ask what it believed *before* the move. And stale,
-> low-value memories get forgotten automatically; pinned identity facts never do."
-
-**1:15 – 1:45 — Bi-temporal + how it works**
-Show `docs/architecture.svg` on screen.
-> "Every fact has event time and transaction time. Write-time distillation turns raw
-> messages into atomic keyed facts so updates supersede reliably. The read path has no
-> LLM — pure vector plus decay — so recall is fast."
-
-**1:45 – 2:15 — Unplug the internet**
-Turn off wifi on screen. Terminal, with `.env`/shell set to:
-```bash
-LLM_PROVIDER=ollama OLLAMA_MODEL=tenet-distiller-1.5b-v2 EMBED_PROVIDER=ollama
-```
-```python
-m.ingest("I just moved to Denver.")
-m.ingest("Update: I moved to Austin.")           # supersedes, fully offline
-m.uncertain_facts()                              # learned-dynamics confidence, zero-LLM (`tenet doubts` on the CLI)
-m.recall("where did I live?", as_of=<before the move>)   # time-travel, zero-LLM
-```
-> "Wifi's off. This is our own LoRA-tuned distiller, trained on an RTX 3080, replacing
-> Qwen Cloud for the one LLM call in the write path. Learn, supersede, doubt,
-> time-travel — the whole loop, zero cloud calls."
-
-**2:15 – 2:45 — MCP + Qwen Cloud**
-Show Claude Desktop (or the MCP tool list) using `learn`/`recall`; show `smoke_test.py`.
-> "Back online, it's MCP-native — drop it into any MCP client and your agent has
-> persistent memory, powered by Qwen Cloud: distillation on qwen3.6-flash, retrieval
-> on text-embedding-v4, reading on qwen3.7-plus."
-
-**2:45 – 3:00 — Honest results + close**
-Show the `docs/BENCHMARK.md` table.
-> "It's competitive with strong RAG on raw recall — but its edge is answering with the
-> *current* value of a changed fact, offline if you need it. That's Tenet: memory that
-> manages itself."
+Rubric this maps to: Innovation 30 / Technical Depth 30 / Impact 25 / Presentation 15 (ties → Innovation).
 
 ---
 
-## Final shot list (<3 min) — exact commands per beat
+## The script (shot by shot)
 
-Timed beats mapped to the exact terminal commands to run while recording. Two env
-workarounds matter on a machine like this one (large ML caches redirected to an
-external/network volume): if that volume isn't mounted or writable, override the cache
-vars inline rather than editing shell profile, and point the DB at a scratch path so the
-recording starts from a clean store every take:
+**0:00–0:18 — Hook: a problem the judge feels (no "hi, we're…")**
+> "Give an LLM agent 'memory' today and it's really just RAG over a transcript — append and
+> retrieve. That breaks the moment a fact *changes*: you move cities, change jobs — and the agent
+> still has both the old and new answer sitting in its retrieval pool, and sometimes serves the
+> stale one. Tenet fixes that."
 
+**0:18–1:05 — The wow, live and visible: bi-temporal supersession you can watch**
+Screen: the belief-ledger web demo (already deployed on **Alibaba Cloud Function Compute**).
+Pre-warm it (one `/health` hit) before recording so the first write is instant.
+> "This is Tenet's belief state, live. I tell it: *I live in Boston, I work at Acme.*"
+Type it into the demo chat → two belief cards appear.
+> "Now: *I just moved to Seattle.*"
+The `user::residence` card **strikes through Boston and shows Seattle** — on screen.
+> "It didn't keep both. The old value is *superseded* — retired to history, not deleted — so
+> 'where do I live?' answers Seattle, only. And I can scrub the time-travel slider back to before
+> the move and it correctly says Boston. Nothing here called an LLM — the read path is pure
+> vectors plus closed-form decay math."
+
+**1:05–1:35 — The stress test RAG structurally can't pass**
+Screen: the "churn" panel / `docs/horizon.svg`, or run `tenet bench run horizon`.
+> "Here's why this matters at scale. Update one fact over and over. Naive RAG collapses from 100%
+> to 50% correct once the stale versions crowd the top-k. Tenet holds **100%** — because it's
+> resolved at write time, not re-derived at every read."
+
+**1:35–2:10 — How it works + the technical edge (one architecture view)**
+Screen: `docs/architecture.svg`.
+> "Built end-to-end on Qwen Cloud: `qwen3.6-flash` distills each message into an atomic
+> `subject::attribute` fact, `text-embedding-v4` embeds, `qwen3.7-plus` reads. Every fact carries
+> event time and transaction time — that's the bi-temporal model Zep and Engram also use — but
+> Tenet is the first *embedded, deterministic* version: no graph database, no LLM in the
+> supersession path, no LLM on the read path. `pip install`, SQLite + numpy, reads ~11 ms flat
+> from 1k to 100k facts."
+
+**2:10–2:40 — Proof + reach (Impact)**
+Screen: README "Results at a glance" / `docs/BENCHMARK.md` §6.
+> "On the standardized MemoryAgentBench, single-hop **97.0%** — above the published gpt-4o-tier
+> result — and multi-hop **45.8%**, 1.5× the published SOTA, on a *local 7B* reader at $0. It's
+> MCP-native, drops into LangGraph / LlamaIndex / Mem0, and it's already the belief board inside
+> our Track-3 agent society. One memory engine, real products."
+
+**2:40–3:00 — Honest close**
+> "It's not a better one-shot retriever — strong RAG ties it on raw recall, and we report that.
+> Its edge is staying *correct* when facts change, offline if you need it, with a belief state you
+> can actually open and read. That's Tenet. Thanks for watching."
+
+---
+
+## Exact commands per beat
+
+Clean store per take + local-embedder cache (only if a beat runs locally instead of the live box):
 ```bash
-export TENET_DB_PATH=/tmp/tenet_demo.db          # clean store per take
-export HF_HOME=~/.cache/huggingface               # only needed for local-embedder beats
-export TRANSFORMERS_CACHE=~/.cache/huggingface     # transformers reads this before HF_HOME
+export TENET_DB_PATH=/tmp/tenet_demo.db
+export HF_HOME=~/.cache/huggingface TRANSFORMERS_CACHE=~/.cache/huggingface
 ```
 
-| beat | time | on screen | command |
+| beat | time | on screen | how |
 |---|---|---|---|
-| Hook | 0:00–0:20 | title card / talking head | — (voiceover only, see script above) |
-| Zero-key demo | 0:20–0:50 | terminal, local embedder, no key, no network | `pip install tenet-memory[local]` then `python examples/00_zero_key_demo.py` — **verified**: runs clean end-to-end offline with the env overrides above (supersession, time-travel, and a live `doubts` line all print); note it does need network on the *very first* run to fetch `bge-small-en-v1.5` once — pre-warm the cache before recording so the take itself is airplane-mode-safe |
-| Web ledger + supersession/time-travel | 0:50–1:30 | `src/tenet/static/index.html` via the HTTP API | `uvicorn tenet.api:app --host 0.0.0.0 --port 8000` then drive `/ingest` + the ledger UI in a browser (struck-through history, time-travel scrubber) |
-| Doubts + drift model | 1:30–1:50 | terminal, `tenet doubts` Rich table | `tenet doubts` (needs a store with some age-decayed facts — reuse the zero-key demo's seeded ledger, `TENET_DB_PATH` still pointed at it) |
-| Unplug-the-internet, zero-cloud | 1:50–2:20 | wifi toggled off on screen, terminal | `LLM_PROVIDER=ollama OLLAMA_MODEL=tenet-distiller-1.5b-v2 EMBED_PROVIDER=ollama tenet remember "I moved from Boston to Seattle"` then `tenet doubts` — needs the ollama box reachable (local or `OLLAMA_BASE_URL` over Tailscale) *before* wifi drops if it's remote |
-| Benchmark slide | 2:20–2:50 | `docs/BENCHMARK.md` §3 churn curve (`docs/horizon.svg`) + §6 FactConsolidation table, or the README "Results at a glance" table | no command — static slide/scroll |
-| Close | 2:50–3:00 | logo / repo URL card | — |
+| Hook | 0:00–0:18 | title card / talking head | voiceover only |
+| Supersession wow | 0:18–1:05 | belief-ledger web demo (FC box, or `uvicorn tenet.api:app --port 8000` + `src/tenet/static/index.html`) | pre-warm `/health`, then type the 3 messages; strike-through + time-travel slider are the money shot |
+| Churn stress | 1:05–1:35 | `docs/horizon.svg` or `tenet bench run horizon` | static slide, or run the command with output pre-captured |
+| Architecture | 1:35–2:10 | `docs/architecture.svg` | static |
+| Results | 2:10–2:40 | README results table / `docs/BENCHMARK.md` §6 | static scroll |
+| Close | 2:40–3:00 | logo / repo URL card | voiceover |
 
-**Verification status, stated plainly:** the zero-key demo (0:20–0:50 beat) was actually
-executed end-to-end during this pass and confirmed working with the cache-var overrides
-above. The web-ledger, `tenet doubts`, and offline-ollama beats were not re-executed here
-(the ollama beat needs the GPU box up and the offline beat needs wifi actually toggled,
-neither of which is safe to script blind) — they're the same commands already documented
-and working elsewhere in this repo (README "Fully local / air-gapped", `tenet doubts`
-CLI, `src/tenet/api.py`); dry-run each once before the real recording take.
+Zero-key alternative for the wow (if you'd rather show a terminal than the web box):
+`pip install -e ".[local]" && python examples/00_zero_key_demo.py` (from a clone; pre-fetch the
+bge-small model once so the take is airplane-mode-safe) or `tenet timeline --all` after two
+`tenet remember` calls — it renders the superseded chain (○ Boston [superseded] → ● Seattle).
+
+## Never-stall checklist (do before the real take)
+- [ ] **Pre-warm the FC box** (`curl .../health` once) — cold start can add ~8s to the first write.
+- [ ] Point `TENET_DB_PATH` at a fresh scratch file so each take starts from an empty ledger.
+- [ ] Have the three messages copied to clipboard — don't type live.
+- [ ] Pre-fetch the local embedder model if using the zero-key terminal beat.
+- [ ] Dry-run the whole flow once end-to-end and **time it** — cut to fit under 3:00, trim the churn
+      beat first if long.
+- [ ] YouTube: **public** + **"Not for Kids"**; grab the link as soon as upload starts.
+
+## One-line-per-rubric-axis (say these, or ensure the visuals land them)
+- **Innovation (30):** first embedded, deterministic bi-temporal memory — supersession by stable-key
+  collision, zero LLM in the write-conflict or read path.
+- **Technical Depth (30):** one core shared by CLI / MCP / HTTP / adapters; ~11 ms flat reads;
+  learned drift model; fail-loud provider layer; every number a Wilson CI.
+- **Impact (25):** 97.0 SH above gpt-4o tier at $0 local; five shipped deployment patterns; already
+  load-bearing in a second product.
+- **Presentation (15):** the belief state is visible and readable — supersession happens *on screen*.
+
+## AliCloud proof (for the separate/optional deploy shot + the form field)
+Live backend on Alibaba Cloud Function Compute: `https://tenet-demo-wrenarokun.ap-southeast-1.fcapp.run`.
+Code-file proof: `src/tenet/config.py` (`dashscope-intl.aliyuncs.com`) + `src/tenet/alicloud_oss.py`.

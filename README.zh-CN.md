@@ -23,7 +23,7 @@
 [![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](src/tenet/mcp_server.py)
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
 
-*读取记忆不应该消耗一次 LLM 调用。*
+*当你的事实改变时依然正确的智能体记忆——而且读取从不消耗一次 LLM 调用。*
 
 **[English README](README.md)** · 本翻译由 Anthropic 的 Claude（Fable 5）完成，并使用开源机器翻译系统
 [Argos Translate](https://github.com/argosopentech/argos-translate)（LibreTranslate 所用引擎）

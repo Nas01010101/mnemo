@@ -23,7 +23,7 @@
 [![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](src/tenet/mcp_server.py)
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
 
-*Memory reads shouldn't cost an LLM call.*
+*Agent memory that stays correct when your facts change — and never costs an LLM call to read.*
 
 **English** · [简体中文](README.zh-CN.md)
 
