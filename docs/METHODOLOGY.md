@@ -93,8 +93,10 @@ cross-reader claim should be re-run with one API call per item before it is load
 
 ## What each headline number licenses
 
-- **§6 FC 86.5% SH pooled** — solid: deterministic SubEM, official prompt, Wilson CIs at
-  n≥100, weak-backbone control. Supports "above published mini-tier SOTA on SH."
+- **§6 FC 97.0% SH / 45.8% MH pooled (2026-07-19 fixed-keys run)** — solid: deterministic
+  SubEM, official prompt, Wilson CIs at n≥100, weak-backbone control, RAG arm reproduced
+  exactly across runs. Supports "SH above the published gpt-4o-tier pooled; MH 1.5× the
+  published SOTA." Pre-fix run (86.5/30.0) preserved in the artifact.
 - **§9 ChurnBench / §9.1 fix** — solid: deterministic, seeded, hand-checked scorer. Supports
   the *falsified-then-partially-fixed* half-life story as stated (half-life 8, still < Mem0 32).
 - **§13 PersonaMem tie** — supports "retrieved memory adds ≥16pp" and "no *detectable*

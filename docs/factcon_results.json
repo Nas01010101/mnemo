@@ -1,363 +1,549 @@
 {
+ "config": {
+  "benchmark": "MAB FactConsolidation (MemoryAgentBench, arXiv:2507.05257)",
+  "reproduce": "LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic",
+  "reader": "local qwen2.5:7b (ollama)",
+  "embedder": "local bge-small (sentence-transformers)",
+  "keys": "heuristic (deterministic, zero-LLM ingestion)",
+  "qpc": 100,
+  "scoring": "MAB official SubEM (normalize + substring + max-over-golds), verbatim",
+  "prompt": "MAB official 'rag_agent' template, verbatim",
+  "note": "FULL n=100/cell (n=800) rerun after the ingestion-keyer fix (see keyer_fix). Same protocol, reader, embedder, prompts, scoring as the 2026-07-17 run (preserved below as previous_run). RAG arm is ingestion-independent and reproduces the prior run's pooled 47.8% SH exactly \u2014 a clean control that only Tenet's ingestion changed. Raw misses: docs_scratch/factcon_decomp_<cell>_misses.jsonl (pre-fix misses archived in docs_scratch/factcon_oldkey_run/).",
+  "run_date": "2026-07-19"
+ },
+ "keyer_fix": {
+  "root_cause": "heuristic ingestion key = 'fact minus last TWO words' only collided update pairs whose VALUES were exactly two words long; 1-word ('Goldust') or 4-word ('United States of America') values produced different keys, the stale fact survived ingestion, and multi-hop chains rode the superseded branch",
+  "found_via": "audit of the 2026-07-17 run's per-question miss files (280 tenet MH misses)",
+  "fix": "template-marker keyer (_heuristic_key in scripts/bench_factcon.py): earliest relation-marker occurrence, longest-first at ties, last-' is ' fallback; markers derived from a frequency scan of the dataset's own fact inventory",
+  "validation": "5/5 audited miss pairs now collide; supersession-chain coverage 63.0% -> 87.6% of facts; largest merged groups inspected, no over-merges",
+  "still_zero_llm": true
+ },
+ "per_cell": {
+  "sh_6k": {
+   "rag": {
+    "correct": 36,
+    "n": 100,
+    "acc": 36.0,
+    "ci_lo": 27.3,
+    "ci_hi": 45.8
+   },
+   "tenet": {
+    "correct": 99,
+    "n": 100,
+    "acc": 99.0,
+    "ci_lo": 94.6,
+    "ci_hi": 99.8
+   }
+  },
+  "sh_32k": {
+   "rag": {
+    "correct": 50,
+    "n": 100,
+    "acc": 50.0,
+    "ci_lo": 40.4,
+    "ci_hi": 59.6
+   },
+   "tenet": {
+    "correct": 96,
+    "n": 100,
+    "acc": 96.0,
+    "ci_lo": 90.2,
+    "ci_hi": 98.4
+   }
+  },
+  "sh_64k": {
+   "rag": {
+    "correct": 52,
+    "n": 100,
+    "acc": 52.0,
+    "ci_lo": 42.3,
+    "ci_hi": 61.5
+   },
+   "tenet": {
+    "correct": 97,
+    "n": 100,
+    "acc": 97.0,
+    "ci_lo": 91.5,
+    "ci_hi": 99.0
+   }
+  },
+  "sh_262k": {
+   "rag": {
+    "correct": 53,
+    "n": 100,
+    "acc": 53.0,
+    "ci_lo": 43.3,
+    "ci_hi": 62.5
+   },
+   "tenet": {
+    "correct": 96,
+    "n": 100,
+    "acc": 96.0,
+    "ci_lo": 90.2,
+    "ci_hi": 98.4
+   }
+  },
+  "mh_6k": {
+   "rag": {
+    "correct": 5,
+    "n": 100,
+    "acc": 5.0,
+    "ci_lo": 2.2,
+    "ci_hi": 11.2
+   },
+   "tenet": {
+    "correct": 55,
+    "n": 100,
+    "acc": 55.0,
+    "ci_lo": 45.2,
+    "ci_hi": 64.4
+   }
+  },
+  "mh_32k": {
+   "rag": {
+    "correct": 3,
+    "n": 100,
+    "acc": 3.0,
+    "ci_lo": 1.0,
+    "ci_hi": 8.5
+   },
+   "tenet": {
+    "correct": 44,
+    "n": 100,
+    "acc": 44.0,
+    "ci_lo": 34.7,
+    "ci_hi": 53.8
+   }
+  },
+  "mh_64k": {
+   "rag": {
+    "correct": 3,
+    "n": 100,
+    "acc": 3.0,
+    "ci_lo": 1.0,
+    "ci_hi": 8.5
+   },
+   "tenet": {
+    "correct": 49,
+    "n": 100,
+    "acc": 49.0,
+    "ci_lo": 39.4,
+    "ci_hi": 58.7
+   }
+  },
+  "mh_262k": {
+   "rag": {
+    "correct": 7,
+    "n": 100,
+    "acc": 7.0,
+    "ci_lo": 3.4,
+    "ci_hi": 13.7
+   },
+   "tenet": {
+    "correct": 35,
+    "n": 100,
+    "acc": 35.0,
+    "ci_lo": 26.4,
+    "ci_hi": 44.7
+   }
+  }
+ },
+ "pooled": {
+  "rag": {
+   "SH": {
+    "correct": 191,
+    "n": 400,
+    "acc": 47.8,
+    "ci_lo": 42.9,
+    "ci_hi": 52.6
+   },
+   "MH": {
+    "correct": 18,
+    "n": 400,
+    "acc": 4.5,
+    "ci_lo": 2.9,
+    "ci_hi": 7.0
+   }
+  },
+  "tenet": {
+   "SH": {
+    "correct": 388,
+    "n": 400,
+    "acc": 97.0,
+    "ci_lo": 94.8,
+    "ci_hi": 98.3
+   },
+   "MH": {
+    "correct": 183,
+    "n": 400,
+    "acc": 45.8,
+    "ci_lo": 40.9,
+    "ci_hi": 50.6
+   }
+  }
+ },
+ "previous_run": {
   "config": {
-    "benchmark": "MAB FactConsolidation (MemoryAgentBench, arXiv:2507.05257)",
-    "reproduce": "LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic",
-    "reader": "local qwen2.5:7b (ollama)",
-    "embedder": "local bge-small (sentence-transformers)",
-    "keys": "heuristic (deterministic, zero-LLM ingestion)",
-    "qpc": 100,
-    "scoring": "MAB official SubEM (normalize + substring + max-over-golds), verbatim",
-    "prompt": "MAB official 'rag_agent' template, verbatim",
-    "note": "FULL n=100/cell (n=800) reproduction, run cell-per-process (a cross-cell native crash \u2014 SIGBUS at cell transitions \u2014 was worked around by isolating each cell in its own process; per-cell results are unaffected). Raw misses: docs_scratch/factcon_decomp_<cell>_misses.jsonl."
+   "benchmark": "MAB FactConsolidation (MemoryAgentBench, arXiv:2507.05257)",
+   "reproduce": "LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic",
+   "reader": "local qwen2.5:7b (ollama)",
+   "embedder": "local bge-small (sentence-transformers)",
+   "keys": "heuristic (deterministic, zero-LLM ingestion)",
+   "qpc": 100,
+   "scoring": "MAB official SubEM (normalize + substring + max-over-golds), verbatim",
+   "prompt": "MAB official 'rag_agent' template, verbatim",
+   "note": "FULL n=100/cell (n=800) reproduction, run cell-per-process (a cross-cell native crash \u2014 SIGBUS at cell transitions \u2014 was worked around by isolating each cell in its own process; per-cell results are unaffected). Raw misses: docs_scratch/factcon_decomp_<cell>_misses.jsonl."
   },
   "per_cell": {
-    "sh_6k": {
-      "rag": {
-        "correct": 37,
-        "n": 100,
-        "acc": 37.0,
-        "ci_lo": 28.2,
-        "ci_hi": 46.8
-      },
-      "tenet": {
-        "correct": 88,
-        "n": 100,
-        "acc": 88.0,
-        "ci_lo": 80.2,
-        "ci_hi": 93.0
-      }
+   "sh_6k": {
+    "rag": {
+     "correct": 37,
+     "n": 100,
+     "acc": 37.0,
+     "ci_lo": 28.2,
+     "ci_hi": 46.8
     },
-    "sh_32k": {
-      "rag": {
-        "correct": 51,
-        "n": 100,
-        "acc": 51.0,
-        "ci_lo": 41.3,
-        "ci_hi": 60.6
-      },
-      "tenet": {
-        "correct": 92,
-        "n": 100,
-        "acc": 92.0,
-        "ci_lo": 85.0,
-        "ci_hi": 95.9
-      }
-    },
-    "sh_64k": {
-      "rag": {
-        "correct": 53,
-        "n": 100,
-        "acc": 53.0,
-        "ci_lo": 43.3,
-        "ci_hi": 62.5
-      },
-      "tenet": {
-        "correct": 85,
-        "n": 100,
-        "acc": 85.0,
-        "ci_lo": 76.7,
-        "ci_hi": 90.7
-      }
-    },
-    "sh_262k": {
-      "rag": {
-        "correct": 54,
-        "n": 100,
-        "acc": 54.0,
-        "ci_lo": 44.3,
-        "ci_hi": 63.4
-      },
-      "tenet": {
-        "correct": 81,
-        "n": 100,
-        "acc": 81.0,
-        "ci_lo": 72.2,
-        "ci_hi": 87.5
-      }
-    },
-    "mh_6k": {
-      "rag": {
-        "correct": 5,
-        "n": 100,
-        "acc": 5.0,
-        "ci_lo": 2.2,
-        "ci_hi": 11.2
-      },
-      "tenet": {
-        "correct": 41,
-        "n": 100,
-        "acc": 41.0,
-        "ci_lo": 31.9,
-        "ci_hi": 50.8
-      }
-    },
-    "mh_32k": {
-      "rag": {
-        "correct": 3,
-        "n": 100,
-        "acc": 3.0,
-        "ci_lo": 1.0,
-        "ci_hi": 8.5
-      },
-      "tenet": {
-        "correct": 30,
-        "n": 100,
-        "acc": 30.0,
-        "ci_lo": 21.9,
-        "ci_hi": 39.6
-      }
-    },
-    "mh_64k": {
-      "rag": {
-        "correct": 3,
-        "n": 100,
-        "acc": 3.0,
-        "ci_lo": 1.0,
-        "ci_hi": 8.5
-      },
-      "tenet": {
-        "correct": 29,
-        "n": 100,
-        "acc": 29.0,
-        "ci_lo": 21.0,
-        "ci_hi": 38.5
-      }
-    },
-    "mh_262k": {
-      "rag": {
-        "correct": 7,
-        "n": 100,
-        "acc": 7.0,
-        "ci_lo": 3.4,
-        "ci_hi": 13.7
-      },
-      "tenet": {
-        "correct": 20,
-        "n": 100,
-        "acc": 20.0,
-        "ci_lo": 13.3,
-        "ci_hi": 28.9
-      }
+    "tenet": {
+     "correct": 88,
+     "n": 100,
+     "acc": 88.0,
+     "ci_lo": 80.2,
+     "ci_hi": 93.0
     }
+   },
+   "sh_32k": {
+    "rag": {
+     "correct": 51,
+     "n": 100,
+     "acc": 51.0,
+     "ci_lo": 41.3,
+     "ci_hi": 60.6
+    },
+    "tenet": {
+     "correct": 92,
+     "n": 100,
+     "acc": 92.0,
+     "ci_lo": 85.0,
+     "ci_hi": 95.9
+    }
+   },
+   "sh_64k": {
+    "rag": {
+     "correct": 53,
+     "n": 100,
+     "acc": 53.0,
+     "ci_lo": 43.3,
+     "ci_hi": 62.5
+    },
+    "tenet": {
+     "correct": 85,
+     "n": 100,
+     "acc": 85.0,
+     "ci_lo": 76.7,
+     "ci_hi": 90.7
+    }
+   },
+   "sh_262k": {
+    "rag": {
+     "correct": 54,
+     "n": 100,
+     "acc": 54.0,
+     "ci_lo": 44.3,
+     "ci_hi": 63.4
+    },
+    "tenet": {
+     "correct": 81,
+     "n": 100,
+     "acc": 81.0,
+     "ci_lo": 72.2,
+     "ci_hi": 87.5
+    }
+   },
+   "mh_6k": {
+    "rag": {
+     "correct": 5,
+     "n": 100,
+     "acc": 5.0,
+     "ci_lo": 2.2,
+     "ci_hi": 11.2
+    },
+    "tenet": {
+     "correct": 41,
+     "n": 100,
+     "acc": 41.0,
+     "ci_lo": 31.9,
+     "ci_hi": 50.8
+    }
+   },
+   "mh_32k": {
+    "rag": {
+     "correct": 3,
+     "n": 100,
+     "acc": 3.0,
+     "ci_lo": 1.0,
+     "ci_hi": 8.5
+    },
+    "tenet": {
+     "correct": 30,
+     "n": 100,
+     "acc": 30.0,
+     "ci_lo": 21.9,
+     "ci_hi": 39.6
+    }
+   },
+   "mh_64k": {
+    "rag": {
+     "correct": 3,
+     "n": 100,
+     "acc": 3.0,
+     "ci_lo": 1.0,
+     "ci_hi": 8.5
+    },
+    "tenet": {
+     "correct": 29,
+     "n": 100,
+     "acc": 29.0,
+     "ci_lo": 21.0,
+     "ci_hi": 38.5
+    }
+   },
+   "mh_262k": {
+    "rag": {
+     "correct": 7,
+     "n": 100,
+     "acc": 7.0,
+     "ci_lo": 3.4,
+     "ci_hi": 13.7
+    },
+    "tenet": {
+     "correct": 20,
+     "n": 100,
+     "acc": 20.0,
+     "ci_lo": 13.3,
+     "ci_hi": 28.9
+    }
+   }
   },
   "pooled": {
-    "SH": {
-      "rag": {
-        "correct": 195,
-        "n": 400,
-        "acc": 48.8,
-        "ci_lo": 43.9,
-        "ci_hi": 53.6
-      },
-      "tenet": {
-        "correct": 346,
-        "n": 400,
-        "acc": 86.5,
-        "ci_lo": 82.8,
-        "ci_hi": 89.5
-      }
+   "SH": {
+    "rag": {
+     "correct": 195,
+     "n": 400,
+     "acc": 48.8,
+     "ci_lo": 43.9,
+     "ci_hi": 53.6
     },
-    "MH": {
-      "rag": {
-        "correct": 18,
-        "n": 400,
-        "acc": 4.5,
-        "ci_lo": 2.9,
-        "ci_hi": 7.0
-      },
-      "tenet": {
-        "correct": 120,
-        "n": 400,
-        "acc": 30.0,
-        "ci_lo": 25.7,
-        "ci_hi": 34.7
-      }
+    "tenet": {
+     "correct": 346,
+     "n": 400,
+     "acc": 86.5,
+     "ci_lo": 82.8,
+     "ci_hi": 89.5
     }
+   },
+   "MH": {
+    "rag": {
+     "correct": 18,
+     "n": 400,
+     "acc": 4.5,
+     "ci_lo": 2.9,
+     "ci_hi": 7.0
+    },
+    "tenet": {
+     "correct": 120,
+     "n": 400,
+     "acc": 30.0,
+     "ci_lo": 25.7,
+     "ci_hi": 34.7
+    }
+   }
   },
   "provenance": "Full-power re-run 2026-07-17 resolving the 2026-07-16 bounded run's flagged discrepancy (that artifact: qpc=10, SH pooled 70.0 [54.6,81.9] n=40). This run reproduces the published per-cell numbers within 1pt on every cell and the pooled numbers essentially exactly: SH 86.5 vs published 86.5, MH 30.0 vs published 30.2. Cost: $0 (local ollama reader, local embeddings, zero-LLM heuristic keys); DashScope was never called.",
   "published_claim": {
-    "source": "README.md, docs/BENCHMARK.md section 6, docs/COMPARISON.md (since commit f6a0ac0, 2026-07-07)",
-    "sh_pooled": {
-      "acc": 86.5,
-      "ci_lo": 82.8,
-      "ci_hi": 89.5,
-      "n": 400
-    },
-    "mh_pooled": {
-      "acc": 30.2,
-      "ci_lo": 26.0,
-      "ci_hi": 34.9,
-      "n": 400
-    }
+   "source": "README.md, docs/BENCHMARK.md section 6, docs/COMPARISON.md (since commit f6a0ac0, 2026-07-07)",
+   "sh_pooled": {
+    "acc": 86.5,
+    "ci_lo": 82.8,
+    "ci_hi": 89.5,
+    "n": 400
+   },
+   "mh_pooled": {
+    "acc": 30.2,
+    "ci_lo": 26.0,
+    "ci_hi": 34.9,
+    "n": 400
+   }
   },
   "discrepancy_note": "RESOLVED 2026-07-17: the published 86.5 SH / 30.2 MH reproduces exactly under the documented config (this file). The earlier qpc=10 SH=70.0 reading was under-powered sampling noise. A separate same-night full run that accidentally used --tenet-read official (not the documented decompose) scored SH pooled 66.8 / MH pooled 7.5 \u2014 see reading_mode_ablation: the gap between the two runs is entirely the reading mode, a real and reportable ablation, not a claim discrepancy.",
   "reading_mode_ablation": {
-    "note": "Same night, same stack, same seeds/questions, ONLY --tenet-read differs. official = MAB's rag_agent answer prompt on the recalled pool; decompose = verbatim-extraction reading for SH + per-hop Self-Ask for MH. RAG arm is identical in both (it always uses the official prompt) \u2014 its match across runs (48.8 vs 48.8 SH pooled) confirms the ablation isolates the tenet reading mode.",
-    "official": {
-      "per_cell": {
-        "sh_6k": {
-          "rag": {
-            "correct": 37,
-            "n": 100,
-            "acc": 37.0,
-            "ci_lo": 28.2,
-            "ci_hi": 46.8
-          },
-          "tenet": {
-            "correct": 70,
-            "n": 100,
-            "acc": 70.0,
-            "ci_lo": 60.4,
-            "ci_hi": 78.1
-          }
-        },
-        "sh_32k": {
-          "rag": {
-            "correct": 51,
-            "n": 100,
-            "acc": 51.0,
-            "ci_lo": 41.3,
-            "ci_hi": 60.6
-          },
-          "tenet": {
-            "correct": 71,
-            "n": 100,
-            "acc": 71.0,
-            "ci_lo": 61.5,
-            "ci_hi": 79.0
-          }
-        },
-        "sh_64k": {
-          "rag": {
-            "correct": 53,
-            "n": 100,
-            "acc": 53.0,
-            "ci_lo": 43.3,
-            "ci_hi": 62.5
-          },
-          "tenet": {
-            "correct": 65,
-            "n": 100,
-            "acc": 65.0,
-            "ci_lo": 55.3,
-            "ci_hi": 73.6
-          }
-        },
-        "sh_262k": {
-          "rag": {
-            "correct": 54,
-            "n": 100,
-            "acc": 54.0,
-            "ci_lo": 44.3,
-            "ci_hi": 63.4
-          },
-          "tenet": {
-            "correct": 61,
-            "n": 100,
-            "acc": 61.0,
-            "ci_lo": 51.2,
-            "ci_hi": 70.0
-          }
-        },
-        "mh_6k": {
-          "rag": {
-            "correct": 5,
-            "n": 100,
-            "acc": 5.0,
-            "ci_lo": 2.2,
-            "ci_hi": 11.2
-          },
-          "tenet": {
-            "correct": 16,
-            "n": 100,
-            "acc": 16.0,
-            "ci_lo": 10.1,
-            "ci_hi": 24.4
-          }
-        },
-        "mh_32k": {
-          "rag": {
-            "correct": 3,
-            "n": 100,
-            "acc": 3.0,
-            "ci_lo": 1.0,
-            "ci_hi": 8.5
-          },
-          "tenet": {
-            "correct": 7,
-            "n": 100,
-            "acc": 7.0,
-            "ci_lo": 3.4,
-            "ci_hi": 13.7
-          }
-        },
-        "mh_64k": {
-          "rag": {
-            "correct": 3,
-            "n": 100,
-            "acc": 3.0,
-            "ci_lo": 1.0,
-            "ci_hi": 8.5
-          },
-          "tenet": {
-            "correct": 3,
-            "n": 100,
-            "acc": 3.0,
-            "ci_lo": 1.0,
-            "ci_hi": 8.5
-          }
-        },
-        "mh_262k": {
-          "rag": {
-            "correct": 7,
-            "n": 100,
-            "acc": 7.0,
-            "ci_lo": 3.4,
-            "ci_hi": 13.7
-          },
-          "tenet": {
-            "correct": 4,
-            "n": 100,
-            "acc": 4.0,
-            "ci_lo": 1.6,
-            "ci_hi": 9.8
-          }
-        }
+   "note": "Same night, same stack, same seeds/questions, ONLY --tenet-read differs. official = MAB's rag_agent answer prompt on the recalled pool; decompose = verbatim-extraction reading for SH + per-hop Self-Ask for MH. RAG arm is identical in both (it always uses the official prompt) \u2014 its match across runs (48.8 vs 48.8 SH pooled) confirms the ablation isolates the tenet reading mode.",
+   "official": {
+    "per_cell": {
+     "sh_6k": {
+      "rag": {
+       "correct": 37,
+       "n": 100,
+       "acc": 37.0,
+       "ci_lo": 28.2,
+       "ci_hi": 46.8
       },
-      "pooled": {
-        "SH": {
-          "rag": {
-            "correct": 195,
-            "n": 400,
-            "acc": 48.8,
-            "ci_lo": 43.9,
-            "ci_hi": 53.6
-          },
-          "tenet": {
-            "correct": 267,
-            "n": 400,
-            "acc": 66.8,
-            "ci_lo": 62.0,
-            "ci_hi": 71.2
-          }
-        },
-        "MH": {
-          "rag": {
-            "correct": 18,
-            "n": 400,
-            "acc": 4.5,
-            "ci_lo": 2.9,
-            "ci_hi": 7.0
-          },
-          "tenet": {
-            "correct": 30,
-            "n": 400,
-            "acc": 7.5,
-            "ci_lo": 5.3,
-            "ci_hi": 10.5
-          }
-        }
+      "tenet": {
+       "correct": 70,
+       "n": 100,
+       "acc": 70.0,
+       "ci_lo": 60.4,
+       "ci_hi": 78.1
       }
+     },
+     "sh_32k": {
+      "rag": {
+       "correct": 51,
+       "n": 100,
+       "acc": 51.0,
+       "ci_lo": 41.3,
+       "ci_hi": 60.6
+      },
+      "tenet": {
+       "correct": 71,
+       "n": 100,
+       "acc": 71.0,
+       "ci_lo": 61.5,
+       "ci_hi": 79.0
+      }
+     },
+     "sh_64k": {
+      "rag": {
+       "correct": 53,
+       "n": 100,
+       "acc": 53.0,
+       "ci_lo": 43.3,
+       "ci_hi": 62.5
+      },
+      "tenet": {
+       "correct": 65,
+       "n": 100,
+       "acc": 65.0,
+       "ci_lo": 55.3,
+       "ci_hi": 73.6
+      }
+     },
+     "sh_262k": {
+      "rag": {
+       "correct": 54,
+       "n": 100,
+       "acc": 54.0,
+       "ci_lo": 44.3,
+       "ci_hi": 63.4
+      },
+      "tenet": {
+       "correct": 61,
+       "n": 100,
+       "acc": 61.0,
+       "ci_lo": 51.2,
+       "ci_hi": 70.0
+      }
+     },
+     "mh_6k": {
+      "rag": {
+       "correct": 5,
+       "n": 100,
+       "acc": 5.0,
+       "ci_lo": 2.2,
+       "ci_hi": 11.2
+      },
+      "tenet": {
+       "correct": 16,
+       "n": 100,
+       "acc": 16.0,
+       "ci_lo": 10.1,
+       "ci_hi": 24.4
+      }
+     },
+     "mh_32k": {
+      "rag": {
+       "correct": 3,
+       "n": 100,
+       "acc": 3.0,
+       "ci_lo": 1.0,
+       "ci_hi": 8.5
+      },
+      "tenet": {
+       "correct": 7,
+       "n": 100,
+       "acc": 7.0,
+       "ci_lo": 3.4,
+       "ci_hi": 13.7
+      }
+     },
+     "mh_64k": {
+      "rag": {
+       "correct": 3,
+       "n": 100,
+       "acc": 3.0,
+       "ci_lo": 1.0,
+       "ci_hi": 8.5
+      },
+      "tenet": {
+       "correct": 3,
+       "n": 100,
+       "acc": 3.0,
+       "ci_lo": 1.0,
+       "ci_hi": 8.5
+      }
+     },
+     "mh_262k": {
+      "rag": {
+       "correct": 7,
+       "n": 100,
+       "acc": 7.0,
+       "ci_lo": 3.4,
+       "ci_hi": 13.7
+      },
+      "tenet": {
+       "correct": 4,
+       "n": 100,
+       "acc": 4.0,
+       "ci_lo": 1.6,
+       "ci_hi": 9.8
+      }
+     }
+    },
+    "pooled": {
+     "SH": {
+      "rag": {
+       "correct": 195,
+       "n": 400,
+       "acc": 48.8,
+       "ci_lo": 43.9,
+       "ci_hi": 53.6
+      },
+      "tenet": {
+       "correct": 267,
+       "n": 400,
+       "acc": 66.8,
+       "ci_lo": 62.0,
+       "ci_hi": 71.2
+      }
+     },
+     "MH": {
+      "rag": {
+       "correct": 18,
+       "n": 400,
+       "acc": 4.5,
+       "ci_lo": 2.9,
+       "ci_hi": 7.0
+      },
+      "tenet": {
+       "correct": 30,
+       "n": 400,
+       "acc": 7.5,
+       "ci_lo": 5.3,
+       "ci_hi": 10.5
+      }
+     }
     }
+   }
   }
+ },
+ "wall_seconds": 4663
 }

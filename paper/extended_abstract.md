@@ -53,9 +53,11 @@ planted non-memoryless structure (NLL 2.76→1.99, 5 seeds).
 
 **Standardized conflict resolution — MemoryAgentBench FactConsolidation (arXiv:2507.05257), all
 800 questions, official SubEM + prompt, Wilson 95% CIs.** With deterministic zero-LLM keys
-and a deliberately weak local 7B backbone: single-hop **86.5** [82.8, 89.5] — above the
-published gpt-4o-mini-tier SOTA (78.0, CI excludes) — and multi-hop **30.2**, tying it;
-same-harness naive-RAG scores 47.8 / 4.5. In a backbone-matched reimplementation of four
+and a deliberately weak local 7B backbone: single-hop **97.0** [94.8, 98.3] — above even
+the published gpt-4o-tier pooled result (94.8) — and multi-hop **45.8**, 1.5× the published
+SOTA (30.2, CI excludes); same-harness naive-RAG scores 47.8 / 4.5 (2026-07-19 run after
+an ingestion-keyer fix our own miss-file audit exposed; pre-fix 86.5/30.0 preserved in the
+evidence artifact). In a backbone-matched reimplementation of four
 published mechanisms (CAR, Mem0-style, HippoRAG-v2-style, MemAgent-style), Tenet leads
 every arm on both axes. Head-to-head against a released framework run black-box through
 its own pipeline (ReMe, reme-ai 0.4.1.1; identical Qwen reader/judge): **Tenet 67.0% vs

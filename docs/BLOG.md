@@ -62,10 +62,11 @@ For a standardized comparison against the published field we used
 **MemoryAgentBench's FactConsolidation** (arXiv:2507.05257): the official
 **SubEM** metric (deterministic substring match, not an LLM judge), the official
 reader prompt copied verbatim, and **Wilson 95% confidence intervals** on every
-score — all 800 questions, zero exclusions. Single-hop: **86.5% pooled, CI [82.8,
-89.5]**, above the published mini-tier SOTA of 78.0 (our interval excludes it), on a
-deliberately weaker backbone (local qwen2.5:7b vs. the published gpt-4o-mini/gpt-4o
-tiers). Multi-hop ties the published SOTA at 30.2%.
+score — all 800 questions, zero exclusions. Single-hop: **97.0% pooled, CI [94.8,
+98.3]**, above even the published gpt-4o-tier pooled result (94.8), on a deliberately
+weaker backbone (local qwen2.5:7b vs. the published gpt-4o-mini/gpt-4o tiers). Multi-hop:
+**45.8%**, 1.5× the published SOTA of 30.2. (These follow an ingestion-keyer fix our own
+miss-file audit exposed — pre-fix 86.5/30.0, both runs in the evidence artifact.)
 
 To rule out "you just picked a better reader," we reimplemented four published memory
 mechanisms — CAR (candidate extraction + max-serial aggregation, the published-SOTA

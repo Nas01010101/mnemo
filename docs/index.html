@@ -221,7 +221,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:24px; flex-wrap:
   </div>
 
   <div class="tiles">
-    <div class="tile"><div class="v">86.5 <small>SubEM</small></div><div class="k">MemoryAgentBench FactConsolidation single-hop — published mini-tier SOTA is 78.0, naive-RAG 47.8</div></div>
+    <div class="tile"><div class="v">97.0 <small>SubEM</small></div><div class="k">MemoryAgentBench FactConsolidation single-hop — above the published gpt-4o-tier 94.8; mini-tier SOTA 78.0, naive-RAG 47.8</div></div>
     <div class="tile"><div class="v">100%</div><div class="k">current-value accuracy after 12 fact updates — naive-RAG collapses to 50%</div></div>
     <div class="tile"><div class="v">67 <small>vs 34</small></div><div class="k">head-to-head vs ReMe (Alibaba’s memory framework) on LongMemEval_S, same reader &amp; judge, p≈2×10⁻⁶</div></div>
     <div class="tile"><div class="v">−98.5%</div><div class="k">context handed to the reader vs full history, at 100% recall@10</div></div>
@@ -306,7 +306,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:24px; flex-wrap:
     <div class="cc-head">
       <div>
         <h4>MemoryAgentBench · FactConsolidation</h4>
-        <div class="cc-sub">SubEM (official scoring), n=100 per cell, local reader — published single-hop mini-tier SOTA: 78.0</div>
+        <div class="cc-sub">SubEM (official scoring), n=100 per cell, local reader — pooled SH 97.0 / MH 45.8 vs published SOTA 78.0 / 30.2 (2026-07-19 fixed-keys run)</div>
       </div>
       <div class="seg" role="group" aria-label="Hop mode">
         <button id="shBtn" aria-pressed="true">Single-hop</button>
@@ -409,7 +409,7 @@ footer .wrap { display:flex; justify-content:space-between; gap:24px; flex-wrap:
 
   <div class="honest">
     <h3 style="margin-top:0">What we don’t claim</h3>
-    <p>Multi-hop consolidation is honestly hard: 30.0 pooled SubEM (vs RAG’s 4.5) — better than the field,
+    <p>Multi-hop consolidation is honestly hard: 45.8 pooled SubEM (vs RAG’s 4.5, 1.5× the published SOTA after an ingestion-keyer fix our own miss-file audit exposed) — best reported, yet
     far from solved. Multi-session synthesis is a reported weak spot. Every negative result, ablation null,
     and run-invalidating bug we found is documented in the paper and benchmark log — the audit trail is
     part of the submission.</p>
@@ -586,10 +586,10 @@ function lineChart(mountId, xs, series, opts){
 
 const FC = {
   sh: { xs:["6k","32k","64k","262k"],
-    tenet:[{v:88,ci:[80.2,93.0]},{v:92,ci:[85.0,95.9]},{v:85,ci:[76.7,90.7]},{v:81,ci:[72.2,87.5]}],
-    rag:[{v:37,ci:[28.2,46.8]},{v:51,ci:[41.3,60.6]},{v:53,ci:[43.3,62.5]},{v:54,ci:[44.3,63.4]}] },
+    tenet:[{v:99,ci:[94.6,99.8]},{v:96,ci:[90.2,98.4]},{v:97,ci:[91.5,99.0]},{v:96,ci:[90.2,98.4]}],
+    rag:[{v:36,ci:[27.3,45.8]},{v:50,ci:[40.4,59.6]},{v:52,ci:[42.3,61.5]},{v:53,ci:[43.3,62.5]}] },
   mh: { xs:["6k","32k","64k","262k"],
-    tenet:[{v:41,ci:[31.9,50.8]},{v:30,ci:[21.9,39.6]},{v:29,ci:[21.0,38.5]},{v:20,ci:[13.3,28.9]}],
+    tenet:[{v:55,ci:[45.2,64.4]},{v:44,ci:[34.7,53.8]},{v:49,ci:[39.4,58.7]},{v:35,ci:[26.4,44.7]}],
     rag:[{v:5,ci:[2.2,11.2]},{v:3,ci:[1.0,8.5]},{v:3,ci:[1.0,8.5]},{v:7,ci:[3.4,13.7]}] },
 };
 let fcMode = "sh";

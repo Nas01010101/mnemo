@@ -151,9 +151,13 @@ half-life), not a full close of the gap (`docs/BENCHMARK.md` §9–9.1).
   `AGG_READER`, `RETRACT`, `CONSOLIDATE`), and we **publicly falsified our own pre-registered
   churn claim** before fixing it. Every result reproduces from one command.
 - **Beats published SOTA on the standardized benchmark.** MemoryAgentBench (arXiv:2507.05257)
-  FactConsolidation single-hop: **86.5%** [82.8, 89.5], above the published mini-tier SOTA
-  of 78.0 — on a *weaker* local-7B backbone with zero-LLM, deterministic ingestion; ties
-  multi-hop SOTA (30.2). All 800 questions, official metric + prompt verbatim, Wilson CIs.
+  FactConsolidation single-hop: **97.0%** [94.8, 98.3] — above even the published
+  *gpt-4o-tier* pooled result (94.8), CI excludes the mini-tier SOTA (78.0) by 17 points —
+  and multi-hop **45.8%** [40.9, 50.6], **1.5× the published SOTA** (30.2; every published
+  memory system ≤7) — on a *weaker* local-7B backbone with zero-LLM, deterministic
+  ingestion. All 800 questions, official metric + prompt verbatim, Wilson CIs. These
+  numbers follow an ingestion-keyer fix that **our own miss-file audit exposed** (pre-fix
+  86.5/30.0; both runs preserved in `docs/factcon_results.json`).
 - **Same-harness reproduction of four rival methods** (Mem0, CAR, HippoRAG-v2, MemAgent
   style) — Tenet leads every arm on both single- and multi-hop axes.
 - **The regime RAG structurally can't scale to.** On a controlled knowledge-churn

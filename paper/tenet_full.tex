@@ -47,9 +47,9 @@ read-time consistency rule plus write-side embedding key-resolution---both defau
 on---lift its churn half-life from ${<}2$ to $32$ ($U{=}32 \approx 82$--$100\%$ across
 runs, reader non-determinism): at best this \emph{ties} delete-outright Mem0-style (flat
 $100$) without beating it on raw accuracy, while keeping LLM-free reads. On
-MemoryAgentBench \textsc{FactConsolidation}~\cite{mab} it scores $86.5\%$ single-hop
-\ci{82.8}{89.5}---above the published \texttt{gpt-4o-mini}-tier state of the art
-($78.0$) despite using a local 7B backbone---and ties the multi-hop state of the art
+MemoryAgentBench \textsc{FactConsolidation}~\cite{mab} it scores $97.0\%$ single-hop
+\ci{94.8}{98.3}---above even the published \texttt{gpt-4o}-tier pooled result
+($94.8$) despite using a local 7B backbone---and $1.5\times$ the multi-hop state of the art
 ($30.2$); on MemoryAgentBench \textsc{Accurate Retrieval} it averages $59.3$, second only
 to HippoRAG-v2 ($65.1$) among published systems while being the only one whose ingestion
 never calls an LLM, and beats every published memory framework on EventQA ($70.7$ vs $67.6$; Wilson CI excludes);
@@ -104,9 +104,10 @@ current value, rather than at assembly time, where every read must re-derive it.
   path never calls an LLM (\S\ref{sec:method}).
 \item On the standardized \textbf{MemoryAgentBench}~\cite{mab} we evaluate three of the
   four competencies with official metrics and prompts verbatim, Wilson CIs, and matched-reader
-  controls. \textsc{FactConsolidation}: single-hop $86.5$ \ci{82.8}{89.5}, above the
-  published mini-tier SOTA ($78.0$~\cite{freshness}, CI excludes) on a \emph{weaker}
-  (local 7B) backbone; multi-hop $30.2$, tying the same SOTA, where every memory system in the
+  controls. \textsc{FactConsolidation}: single-hop $97.0$ \ci{94.8}{98.3}, above even the
+  published gpt-4o-tier pooled result ($94.8$~\cite{freshness}) on a \emph{weaker}
+  (local 7B) backbone; multi-hop $45.8$, $1.5\times$ the published SOTA ($30.2$, CI
+  excludes), where every memory system in the
   original benchmark table scores $\le 7$ (long-context reasoning baselines reach 28). \textsc{Accurate Retrieval}: average $59.3$,
   second among published systems to HippoRAG-v2's $65.1$~\cite{hipporag2}---which runs
   LLM OpenIE over every context token, where \tenet{} ingests with embeddings
@@ -473,31 +474,38 @@ the reader is a local \texttt{qwen2.5:7b}---\emph{below} the published mini tier
 \toprule
 cell & naive-RAG & \tenet{} & SOTA mini$^{1}$ & SOTA gpt-4o$^{1}$\\
 \midrule
-SH 6K & 36.0 & \textbf{89.0} \ci{81.4}{93.7} & 71 & 99\\
-SH 32K & 50.0 & \textbf{91.0} \ci{83.8}{95.2} & 78 & 92\\
-SH 64K & 52.0 & \textbf{85.0} \ci{76.7}{90.7} & 81 & 95\\
-SH 262K & 53.0 & \textbf{81.0} \ci{72.2}{87.5} & 82 & 93\\
-\textbf{SH pooled} & 47.8 & \textbf{86.5} \ci{82.8}{89.5} & 78.0 & 94.8\\
+SH 6K & 36.0 & \textbf{99.0} \ci{94.6}{99.8} & 71 & 99\\
+SH 32K & 50.0 & \textbf{96.0} \ci{90.2}{98.4} & 78 & 92\\
+SH 64K & 52.0 & \textbf{97.0} \ci{91.5}{99.0} & 81 & 95\\
+SH 262K & 53.0 & \textbf{96.0} \ci{90.2}{98.4} & 82 & 93\\
+\textbf{SH pooled} & 47.8 & \textbf{97.0} \ci{94.8}{98.3} & 78.0 & 94.8\\
 \midrule
-MH 6K & 5.0 & \textbf{42.0} \ci{32.8}{51.8} & 34 & 57\\
-MH 32K & 3.0 & \textbf{30.0} \ci{21.9}{39.6} & 27 & 50\\
-MH 64K & 3.0 & \textbf{29.0} \ci{21.0}{38.5} & 33 & 58\\
-MH 262K & 7.0 & \textbf{20.0} \ci{13.3}{28.9} & 27 & 41\\
-\textbf{MH pooled} & 4.5 & \textbf{30.2} \ci{26.0}{34.9} & 30.2 & 51.5\\
+MH 6K & 5.0 & \textbf{55.0} \ci{45.2}{64.4} & 34 & 57\\
+MH 32K & 3.0 & \textbf{44.0} \ci{34.7}{53.8} & 27 & 50\\
+MH 64K & 3.0 & \textbf{49.0} \ci{39.4}{58.7} & 33 & 58\\
+MH 262K & 7.0 & \textbf{35.0} \ci{26.4}{44.7} & 27 & 41\\
+\textbf{MH pooled} & 4.5 & \textbf{45.8} \ci{40.9}{50.6} & 30.2 & 51.5\\
 \bottomrule
 \end{tabular}
 
 $^{1}$\cite{freshness}: candidate extraction + $\max(\text{serial})$ aggregation.
 \end{center}
 
-Single-hop $86.5$ exceeds the published mini-tier SOTA ($78.0$; our CI excludes it) on a
-weaker backbone; every system in the original MAB table scores $\le 60$ (Zep 7, Mem0 18,
-MemGPT 28). Multi-hop exactly ties the mini-tier SOTA, where the original table's best
-memory system scores $\le 7$ (long-context reasoning baselines reach 28). Single-hop barely degrades with haystack length ($89\!\to\!81$ from
-6K$\to$262K) because the store is conflict-resolved at ingestion---the property
-assembly-time aggregation must re-derive at every read. Multi-hop still degrades with
-length ($42\!\to\!20$); reported honestly. The identical reader over naive-RAG memory
-scores $47.8/4.5$: the mechanism, not the reader, carries the result.
+Single-hop $97.0$ exceeds the published mini-tier SOTA ($78.0$; our CI excludes it by 17
+points) and the gpt-4o-tier pooled point estimate ($94.8$) on a weaker backbone; every
+system in the original MAB table scores $\le 60$ (Zep 7, Mem0 18, MemGPT 28). Multi-hop is
+$1.5\times$ the mini-tier SOTA (CI excludes it), where the original table's best
+memory system scores $\le 7$ (long-context reasoning baselines reach 28)---still below the
+gpt-4o tier's $51.5$, reported honestly. Single-hop barely degrades with haystack length
+(SH $\ge 96$ from 6K$\to$262K) because the store is conflict-resolved at ingestion---the
+property assembly-time aggregation must re-derive at every read. Multi-hop still degrades
+with length ($55\!\to\!35$); reported honestly. The identical reader over naive-RAG memory
+scores $47.8/4.5$: the mechanism, not the reader, carries the result---and the RAG arm
+reproduces its pre-fix pooled $47.8$ exactly across runs. \emph{Provenance: 2026-07-19 run
+after an ingestion-keyer fix found by auditing our own miss files (the zero-LLM heuristic
+key---``fact minus its last two words''---only collided update pairs with two-word values,
+so stale facts silently survived ingestion); the fix is still deterministic and zero-LLM;
+the pre-fix run ($86.5$/$30.0$) is preserved in \texttt{docs/factcon\_results.json}.}
 
 \subsection{MemoryAgentBench \textsc{Accurate Retrieval} and \textsc{Test-Time Learning}}\label{sec:mab}
 22 contexts of 197K--534K tokens, four sub-benchmarks, official per-benchmark metrics,

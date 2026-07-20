@@ -31,9 +31,10 @@ routinely inflated 20–60 points, Tenet reports **every** result with Wilson 95
 **five default-OFF flags that we measured as no-benefit** (`RAW_RECALL`, `AGG_READER`,
 `RETRACT`, `CONSOLIDATE`, `USAGE_RECALL`), and **falsified its own pre-registered churn claim in public**
 (§4.8) before fixing it. We do not claim a cross-protocol LongMemEval win; we claim
-**standardized, apples-to-apples wins** (MemoryAgentBench FactConsolidation **86.5 SH**,
-official SubEM + prompt, *above* the published mini-tier SOTA 78.0 — raw evidence and an
-honestly-flagged discrepancy from a smaller n=40 reproduction: `docs/factcon_results.json`;
+**standardized, apples-to-apples wins** (MemoryAgentBench FactConsolidation **97.0 SH /
+45.8 MH**, official SubEM + prompt, above the published gpt-4o-tier SH pooled (94.8) and
+1.5× the MH SOTA (30.2) — post ingestion-keyer fix found by our own miss-file audit;
+both runs preserved in `docs/factcon_results.json`;
 MAB-AR **59.3**, 2nd of
 all published systems) plus a real head-to-head where we control every variable (§A). The
 brand is: **the memory system whose numbers you can actually reproduce.**

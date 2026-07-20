@@ -81,10 +81,11 @@ bi-temporal supersession, a \textbf{belief--evidence consistency} rule, and a
 belief-anchored evidence expansion---\textbf{at parity with strong RAG on one-shot accuracy at
 equal token budget}, closing a gap belief-only compression left open.
 \item On the standardized \textbf{MemoryAgentBench FactConsolidation} benchmark,
-ingestion-time supersession with zero-LLM deterministic keys \textbf{exceeds the published
-single-hop SOTA at the gpt-4o-mini tier (86.5 vs 78.0 pooled) and ties the multi-hop tier
-(30.2)}---using only a local 7B backbone, where the benchmark's 22 systems score
-$\le$60~/~$\le$7.
+ingestion-time supersession with zero-LLM deterministic keys \textbf{scores 97.0 single-hop
+pooled---above even the published gpt-4o-tier result (94.8)---and 45.8 multi-hop, 1.5$\times$
+the published SOTA (30.2)}---using only a local 7B backbone, where the benchmark's 22
+systems score $\le$60~/~$\le$7 (2026-07-19 run, after an ingestion-keyer fix our own
+miss-file audit exposed; pre-fix 86.5/30.0, both runs in the evidence artifact).
 \end{enumerate}
 
 \section{Related Work}
@@ -289,18 +290,23 @@ backbone} scores, pooled over four haystack lengths (6K--262K):
 \toprule
 pooled & naive-RAG (same reader) & \textbf{Tenet} & published SOTA (mini / gpt-4o)~\cite{freshness} \\
 \midrule
-FC-SH ($n{=}400$) & 47.8 & \textbf{86.5} [82.8, 89.5] & 78.0 / 94.8 \\
-FC-MH ($n{=}400$) & 4.5  & \textbf{30.2} [26.0, 34.9] & 30.2 / 51.5 \\
+FC-SH ($n{=}400$) & 47.8 & \textbf{97.0} [94.8, 98.3] & 78.0 / 94.8 \\
+FC-MH ($n{=}400$) & 4.5  & \textbf{45.8} [40.9, 50.6] & 30.2 / 51.5 \\
 \bottomrule
 \end{tabular}
 \end{center}
-Single-hop \textbf{exceeds the published gpt-4o-mini-tier SOTA (78.0; our CI excludes it) on
-a weaker backbone}; every system in the original benchmark table scores $\le$60 (Zep 7,
-Mem0 18, MemGPT 28). Multi-hop exactly ties the mini-tier SOTA, where the original table's
-best is $\le$7. Accuracy barely degrades with haystack length (SH $89\!\to\!81$ from
-6K$\to$262K): the store is conflict-resolved at ingestion---the property assembly-time
-aggregation must re-derive at every read. Multi-hop still degrades with length
-($42\!\to\!20$); reported honestly.
+Single-hop \textbf{exceeds the published mini-tier SOTA (78.0; our CI excludes it by 17
+points) and the gpt-4o-tier pooled point estimate (94.8) on a weaker backbone}; every
+system in the original benchmark table scores $\le$60 (Zep 7, Mem0 18, MemGPT 28).
+Multi-hop is \textbf{1.5$\times$ the published mini-tier SOTA} (CI excludes it), where the
+original table's best is $\le$7---still below the gpt-4o tier's 51.5, reported honestly.
+Accuracy barely degrades with haystack length (SH $\ge$96 from 6K$\to$262K): the store is
+conflict-resolved at ingestion---the property assembly-time aggregation must re-derive at
+every read. Multi-hop still degrades with length ($55\!\to\!35$); reported honestly.
+\emph{Provenance: 2026-07-19 run after an ingestion-keyer fix found by auditing our own
+miss files (the zero-LLM key only collided two-word values, so stale facts silently
+survived ingestion); still deterministic and zero-LLM, RAG control reproduced exactly,
+pre-fix run (86.5/30.0) preserved in \texttt{docs/factcon\_results.json}.}
 
 To remove the backbone confound entirely, we reimplemented four published memory
 mechanisms as arms of the \emph{same} harness (same 7B reader, embedder, SubEM, prompt;

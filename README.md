@@ -118,7 +118,8 @@ never becomes "operate a database cluster."
 
 | benchmark | metric | Tenet | comparison | source |
 |---|---|---:|---:|---|
-| MemoryAgentBench FactConsolidation (arXiv:2507.05257), single-hop | SubEM, pooled 6K–262K | **86.5** [82.8, 89.5] | published mini-tier SOTA 78.0 · naive-RAG 47.8 | [`BENCHMARK.md` §6](docs/BENCHMARK.md#6-mab-factconsolidation--the-standardized-supersession-benchmark-scriptsbench_factconpy) |
+| MemoryAgentBench FactConsolidation (arXiv:2507.05257), single-hop | SubEM, pooled 6K–262K | **97.0** [94.8, 98.3] | > published gpt-4o-tier 94.8 · mini-tier SOTA 78.0 · naive-RAG 47.8 | [`BENCHMARK.md` §6](docs/BENCHMARK.md#6-mab-factconsolidation--the-standardized-supersession-benchmark-scriptsbench_factconpy) |
+| MAB FactConsolidation, multi-hop | SubEM, pooled 6K–262K | **45.8** [40.9, 50.6] | **1.5×** published SOTA 30.2 (CI excludes) · every published memory system ≤7 · naive-RAG 4.5 | [`BENCHMARK.md` §6](docs/BENCHMARK.md#6-mab-factconsolidation--the-standardized-supersession-benchmark-scriptsbench_factconpy) |
 | MAB Accurate-Retrieval | avg. official metric | **59.3** (2nd of all published systems) | Mem0 32.6 · Zep 37.5 | [`BENCHMARK.md` §7](docs/BENCHMARK.md#7-mab-accurate-retrieval--the-second-mab-competency-scriptsbench_mab_arpy) |
 | MAB Test-Time Learning (5 ICL cells, n=500) | official substr-EM, avg | **77.2** [73.3, 80.7] (local 7B reader, $0) | > BM25 75.4 · MemGPT 67.6 · Zep 62.8 · Mem0 32.4 (GPT-4o-mini reader) | [`BENCHMARK.md` §16](docs/BENCHMARK.md#16-mab-test-time-learning--the-third-mab-competency-scriptsbench_mab_ttlpy) |
 | Knowledge-churn horizon (fact updated 2→12×) | current-value accuracy | **100%** throughout | naive-RAG collapses 100%→50% | [`BENCHMARK.md` §3](docs/BENCHMARK.md#3-long-horizon-knowledge-churn--where-memory-structurally-wins-scriptsbench_horizonpy) |
@@ -126,12 +127,16 @@ never becomes "operate a database cluster."
 | Local LoRA distiller (offline, zero-cloud) | key-consistency, decontaminated | **0.775** | cloud reference (`qwen3.7-plus`) 0.707 | [`BENCHMARK.md` §10](docs/BENCHMARK.md#10-local-distiller-zero-cloud-verdict) |
 | Head-to-head vs **ReMe** (Alibaba's memory framework), LongMemEval_S n=100 | QA accuracy, same reader/judge | **67.0%** [57.3, 75.4] | ReMe (own `auto_memory`+BM25 pipeline) 34.0% · matched RAG 64.0% · blind 0.0% — McNemar tenet-vs-ReMe p≈2×10⁻⁶ | [`reme_h2h_results.json`](docs/reme_h2h_results.json) |
 
-<sup>FactConsolidation raw evidence: [`docs/factcon_results.json`](docs/factcon_results.json) — a full
-n=100/cell (n=800) reproduction (2026-07-17, $0: local reader + embeddings + zero-LLM keys) matches the
-published numbers on every cell within 1pt: SH pooled 86.5 [82.8, 89.5] exactly, MH pooled 30.0 vs 30.2.
-An earlier bounded n=40 spot-check had flagged SH as an unresolved discrepancy; that was sampling noise.
-The file also carries a reading-mode ablation (official-prompt reading: SH 66.8 / MH 7.5 — same memory,
-same reader model; the documented `--tenet-read decompose` is what the claim requires).</sup>
+<sup>FactConsolidation raw evidence: [`docs/factcon_results.json`](docs/factcon_results.json) — the
+2026-07-19 n=800 run after an ingestion-keyer fix that **our own miss-file audit exposed**: the zero-LLM
+heuristic key ("fact minus last two words") only collided update pairs with exactly-2-word values, so many
+stale facts silently survived ingestion. Fixing it (template-marker keyer, still deterministic, still
+zero-LLM): SH 86.5→97.0, MH 30.0→45.8, with the RAG control reproducing its prior 47.8 exactly —
+ingestion was the only thing that changed. The full pre-fix reproduction (2026-07-17, which matched the
+original run within 1pt on every cell: SH 86.5 [82.8, 89.5], MH 30.0 vs 30.2) is preserved in the artifact
+under `previous_run`; an earlier bounded n=40 spot-check's flagged SH discrepancy was resolved as sampling
+noise. The reading-mode ablation stands (official-prompt direct reading: SH 66.8 / MH 7.5, pre-fix — same
+memory, same reader model; the documented `--tenet-read decompose` is what the claim requires).</sup>
 
 <sup>ReMe head-to-head (2026-07-17, [`docs/reme_h2h_results.json`](docs/reme_h2h_results.json)): both
 memory systems ingest the same full ~115k-token haystacks with flash-tier distillers and answer through
@@ -408,13 +413,16 @@ Mem0 18%, MemGPT 28%** single-hop; **≤7%** multi-hop for every memory system i
 
 | pooled 6K–262K | naive-RAG | **Tenet** | published SOTA (mini / gpt-4o) |
 |---|---:|---:|---:|
-| single-hop | 47.8 | **86.5** [82.8, 89.5] | 78.0 / 94.8 |
-| multi-hop | 4.5 | **30.2** [26.0, 34.9] | 30.2 / 51.5 |
+| single-hop | 47.8 | **97.0** [94.8, 98.3] | 78.0 / 94.8 |
+| multi-hop | 4.5 | **45.8** [40.9, 50.6] | 30.2 / 51.5 |
 
-**Above the published mini-tier single-hop SOTA and tied on multi-hop — with a local 7B
-backbone and *zero-LLM* deterministic ingestion.** SubEM + official prompt verbatim; Wilson
-CIs; no length collapse (SH ≥81% at every haystack size). Details: [`docs/BENCHMARK.md`](docs/BENCHMARK.md) §6.
-Raw evidence + an honest flagged discrepancy from a smaller reproduction: [`docs/factcon_results.json`](docs/factcon_results.json).
+**Single-hop above even the published gpt-4o-tier pooled result, multi-hop 1.5× the
+published SOTA — with a local 7B backbone and *zero-LLM* deterministic ingestion.** SubEM +
+official prompt verbatim; Wilson CIs; no length collapse (SH ≥96% at every haystack size).
+These numbers follow a 2026-07-19 ingestion-keyer fix that our own miss-file audit exposed
+(pre-fix: 86.5 / 30.0 — both runs preserved in the artifact). Details:
+[`docs/BENCHMARK.md`](docs/BENCHMARK.md) §6. Raw evidence:
+[`docs/factcon_results.json`](docs/factcon_results.json).
 
 **MAB Accurate-Retrieval** (~2,000 questions over 197K–534K-token contexts, official
 per-benchmark metrics, matched gpt-4o-mini reader): AR average **59.3** — second only to

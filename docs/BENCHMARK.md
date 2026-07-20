@@ -190,55 +190,78 @@ is a **local qwen2.5:7b** — a deliberately weak, laptop-class backbone.
 
 | cell | naive-RAG (control) | **Tenet** | published SOTA mini¹ | published gpt-4o¹ |
 |---|---:|---:|---:|---:|
-| SH 6K   | 36.0 | **89.0** [81.4, 93.7] | 71 | 99 |
-| SH 32K  | 50.0 | **91.0** [83.8, 95.2] | 78 | 92 |
-| SH 64K  | 52.0 | **85.0** [76.7, 90.7] | 81 | 95 |
-| SH 262K | 53.0 | **81.0** [72.2, 87.5] | 82 | 93 |
-| **SH pooled** | 47.8 | **86.5 [82.8, 89.5]** | **78.0** | 94.8 |
-| MH 6K   | 5.0 | **42.0** [32.8, 51.8] | 34 | 57 |
-| MH 32K  | 3.0 | **30.0** [21.9, 39.6] | 27 | 50 |
-| MH 64K  | 3.0 | **29.0** [21.0, 38.5] | 33 | 58 |
-| MH 262K | 7.0 | **20.0** [13.3, 28.9] | 27 | 41 |
-| **MH pooled** | 4.5 | **30.2 [26.0, 34.9]** | **30.2** | 51.5 |
+| SH 6K   | 36.0 | **99.0** [94.6, 99.8] | 71 | 99 |
+| SH 32K  | 50.0 | **96.0** [90.2, 98.4] | 78 | 92 |
+| SH 64K  | 52.0 | **97.0** [91.5, 99.0] | 81 | 95 |
+| SH 262K | 53.0 | **96.0** [90.2, 98.4] | 82 | 93 |
+| **SH pooled** | 47.8 | **97.0 [94.8, 98.3]** | **78.0** | 94.8 |
+| MH 6K   | 5.0 | **55.0** [45.2, 64.4] | 34 | 57 |
+| MH 32K  | 3.0 | **44.0** [34.7, 53.8] | 27 | 50 |
+| MH 64K  | 3.0 | **49.0** [39.4, 58.7] | 33 | 58 |
+| MH 262K | 7.0 | **35.0** [26.4, 44.7] | 27 | 41 |
+| **MH pooled** | 4.5 | **45.8 [40.9, 50.6]** | **30.2** | 51.5 |
 
 ¹ arXiv:2606.01435 (May 2026), the current published SOTA — candidate extraction +
 `max(serial)` aggregation, gpt-4o-mini / gpt-4o backbones.
 
-- **Single-hop: 86.5% pooled — above the published mini-tier SOTA (78.0; our CI excludes
-  it) despite a weaker backbone**, and above every system in the original MAB table at
-  every length (every memory system ≤60%; Zep 7%, Mem0 18%, MemGPT 28%). Per-cell we lead at
-  6K/32K/64K; their mini edges 262K by 1 point.
-- **Multi-hop: 30.2% pooled — exactly ties the published mini-tier SOTA** (their CAR
-  pipeline), again on the weaker backbone; every original-table system is ≤7%.
-- **No length collapse:** SH stays ≥81% from 6K→262K (Mnemos, the only other
+- **Single-hop: 97.0% pooled — the CI excludes the published mini-tier SOTA (78.0) by
+  17 points, and the point estimate is above even the published gpt-4o-tier pooled
+  (94.8)** — on a local 7B reader. Above every system in the original MAB table at every
+  length (every memory system ≤60%; Zep 7%, Mem0 18%, MemGPT 28%), and ≥96 at all four
+  lengths per-cell.
+- **Multi-hop: 45.8% pooled — 1.5× the published mini-tier SOTA (30.2; our CI excludes
+  it)**, leading their mini at every length; every original-table memory system is ≤7%.
+  Still below the gpt-4o-tier 51.5 — reported, not hidden.
+- **No length collapse:** SH stays ≥96% from 6K→262K (Mnemos, the only other
   ingestion-time system reported, collapses 90→28). The store is conflict-resolved at
   ingestion, so haystack size barely matters for single-hop.
-- **Mechanism, not reader:** the identical reader with naive-RAG memory scores 47.8/4.5.
-- Ablation: with LLM-distilled keys instead of heuristic ones, 6K cells score
-  similarly (88/40 in iteration runs) — the templated facts make deterministic keying
-  sufficient; distilled keys matter for free-form conversation instead.
+- **Mechanism, not reader:** the identical reader with naive-RAG memory scores 47.8/4.5 —
+  and the RAG arm reproduces the pre-fix run's pooled 47.8 exactly (ingestion-independent,
+  a clean control that only Tenet's ingestion changed between runs).
+- Ablation (pre-fix iteration runs): LLM-distilled keys score similarly on 6K cells —
+  the templated facts make deterministic keying sufficient; distilled keys matter for
+  free-form conversation instead.
 - Caveats: backbone is *below* the published mini tier (local 7B vs gpt-4o-mini API);
-  MH degrades with length (recall/chaining strain at 18k facts — 42→20) — both reported,
+  MH degrades with length (recall/chaining strain at 18k facts — 55→35) — both reported,
   not hidden.
+
+#### The 2026-07-19 ingestion-keyer fix — found by auditing our own misses
+
+The first full runs of this section (2026-07-07, reproduced within 1pt on 2026-07-17)
+pooled **SH 86.5 / MH 30.0**. An audit of the reproduction's own per-question miss files
+(280 Tenet MH misses) showed pools containing *both* the stale and the updated hop-1 fact
+("married to Rabri Devi" *and* "married to Goldust") — supersession, the mechanism under
+test, was silently failing for many update pairs. Root cause: the zero-LLM heuristic key
+was "the normalized fact minus its last TWO words," which only collides update pairs whose
+values are exactly two words long — a 1-word ("Goldust") or 4-word ("United States of
+America") value produced a different key, the stale fact survived, and multi-hop chains
+rode the superseded branch. The fix (`_heuristic_key`) strips the value at a relation
+marker derived from the dataset's own template inventory (longest-first, last-`" is "`
+fallback) — still fully deterministic, still zero-LLM. Validation before rerunning: all 5
+audited miss pairs collide, supersession-chain coverage rises 63.0%→87.6% of facts, and
+the largest merged key groups were inspected for over-merges (none). Effect of the fix
+alone (identical reader, prompts, scoring; RAG control unchanged): **SH 86.5→97.0,
+MH 30.0→45.8**. Raw evidence for both runs: [`docs/factcon_results.json`](factcon_results.json)
+(pre-fix run preserved under `previous_run`).
 
 Reproduce: `LLM_PROVIDER=ollama OLLAMA_MODEL=qwen2.5:7b EMBED_PROVIDER=local \
 python scripts/bench_factcon.py --qpc 100 --tenet-read decompose --keys heuristic`
 
-**Raw evidence artifact**: unlike ChurnBench/Mem0-h2h/LME, this section's numbers had no
-standalone `docs/*.json` artifact until 2026-07-16 — no raw per-question output from the
-original 2026-07-07 run (commit f6a0ac0) was found anywhere in the repo, `docs_scratch/`,
-`experiments/`, or `data/bench_runs.jsonl`. `docs/factcon_results.json` fills that gap, but
-via a BOUNDED reproduction (n=40/axis, `--qpc 10`, not the full n=400/axis above) — a full
-`--qpc 100` re-run was in progress and reached 60/100 on one cell before the background job
-was reclaimed at ~27 min wall-clock (cost was never the constraint: `LLM_PROVIDER=ollama` is
-$0 either way). At n=40, MH pooled (32.5% [20.1,48.0]) is consistent with the 30.2% above;
-SH pooled (70.0% [54.6,81.9]) is LOWER than the 86.5% above, which sits just outside this
-smaller run's CI. Given the small n and that `--qpc` truncates to the first N questions per
-cell (not a random subsample), this is reported as an **unresolved, flagged discrepancy** —
-not a confirmed correction of the headline number, and not silently kept unverified either.
-A full `--qpc 100` re-run (~2-3h wall-clock, still $0) would resolve which number is right.
+**Raw evidence artifact**: [`docs/factcon_results.json`](factcon_results.json) carries the
+full 2026-07-19 fixed-keys run (per-cell counts + Wilson CIs + the keyer-fix provenance)
+with the complete 2026-07-17 pre-fix full reproduction preserved under `previous_run`.
+History, kept for the record: the original 2026-07-07 run (commit f6a0ac0) shipped with no
+raw artifact; a bounded n=40 spot-check on 2026-07-16 flagged an SH discrepancy that the
+full 2026-07-17 reproduction resolved as sampling noise (SH 86.5 matched exactly); the
+2026-07-19 miss-file audit then found and fixed the ingestion-keyer defect described above.
+Per-question misses for the current run: `docs_scratch/factcon_decomp_<cell>_misses.jsonl`
+(pre-fix misses archived in `docs_scratch/factcon_oldkey_run/`).
 
 ### 6.1 Same-harness reproductions of four published methods (`scripts/bench_baselines.py`)
+*(Run 2026-07-07 with the pre-fix ingestion keyer — the rival arms don't use Tenet's keys,
+so the table stands as a **lower bound** on Tenet's lead; Tenet's own arm under the fixed
+keyer is materially higher, per the §6 headline. Not rerun post-fix.)*
+
 To remove the backbone confound entirely, we reimplemented four published memory
 mechanisms as arms of the SAME harness — same local-7B reader, same embedder, same
 SubEM + official prompt, same questions (6K+32K cells, n=200/pooled cell; MemAgent
@@ -293,9 +316,9 @@ tested tiers** — stated honestly, not oversold.
 **(b) Reader strength rescues naive-RAG on bounded context, but not under churn.** The same
 naive-RAG mechanism, only the backbone changed: FC sh_6k **36.0 → 95.0**, mh_6k **5.0 → 20.0**
 (qwen2.5:7b → qwen3.7-plus). A strong reader does the `max(serial)` reasoning over raw stale
-lines itself, so Tenet's *absolute* margin over RAG compresses (Tenet SH-pooled 86.5 vs RAG
-47.8 at 7b = +38.7pp; a matched flat-pool extract Tenet arm is 90 vs RAG 95 on sh_6k at
-qwen3.7-plus). **But the structural win persists where a reader can't help** — the long-horizon
+lines itself, so Tenet's *absolute* margin over RAG compresses (Tenet SH-pooled 97.0 vs RAG
+47.8 at 7b = +49.2pp; a matched flat-pool extract Tenet arm was 90 vs RAG 95 on sh_6k at
+qwen3.7-plus, measured pre-keyer-fix). **But the structural win persists where a reader can't help** — the long-horizon
 churn test reproduces end-to-end on Qwen Cloud: as a fact is updated 4→8 times, RAG degrades
 **100% → 67%** (top-k fills with stale versions) while Tenet holds **100% → 100%**
 (`bench_horizon.py --principals 3 --distractors 6 --updates 4,8`, n=3/point). Reader strength

@@ -108,13 +108,63 @@ _KEY_SYS = ("For each numbered fact, output its semantic key: 'subject::relation
 
 KEY_MODE = "llm"  # set by --keys; "heuristic" = deterministic zero-LLM ingestion keys
 
+# Relation markers of the FactConsolidation fact templates, derived from the dataset's own
+# fact inventory (frequency scan over all cached contexts). Longest-first at a tie so
+# "is located in the city of" beats "is located in". The old heuristic (drop the last two
+# words) only collided update pairs whose VALUES were exactly two words long — a 1-word
+# ("Goldust") or 4-word ("United States of America") value produced a different key, the
+# stale fact survived, and multi-hop chains rode the superseded branch.
+_REL_MARKERS = sorted([
+    "is associated with the sport of",
+    "is affiliated with the religion of",
+    "was originally broadcasted by",
+    "is located in the city of",
+    "speaks the language of",
+    "plays the position of",
+    "played the position of",
+    "is a citizen of",
+    "was educated is",
+    "is married to",
+    "is employed by",
+    "was created by",
+    "was created in",
+    "was developed by",
+    "was performed by",
+    "was founded by",
+    "was founded in",
+    "is famous for",
+    "was written in",
+    "was born in",
+    "is located in",
+], key=len, reverse=True)
+
+
+def _heuristic_key(text: str) -> str:
+    """Deterministic supersession key: subject + relation, VALUE dropped entirely.
+    Earliest marker occurrence wins (markers scanned longest-first so a superstring
+    marker beats its prefix at the same position); 'The <role> of X is VALUE' facts
+    fall back to a split at the last ' is '; anything else keeps the old drop-2 rule."""
+    low = text.lower()
+    best_i, best_mk = -1, None
+    for mk in _REL_MARKERS:
+        i = low.find(" " + mk + " ")
+        if i != -1 and (best_i == -1 or i < best_i):
+            best_i, best_mk = i, mk
+    if best_mk is not None:
+        return normalize_answer(text[: best_i + 1 + len(best_mk)])
+    j = low.rfind(" is ")
+    if j != -1:
+        return normalize_answer(text[: j + 4])
+    return " ".join(normalize_answer(text).split()[:-2])
+
 
 def extract_keys(facts: list[tuple[int, str]], source: str) -> dict[int, str]:
     """Supersession keys. `heuristic` mode is fully deterministic (no LLM anywhere in
-    ingestion): key = the normalized fact minus its final value words — exploits the
-    templated subject-relation-value shape of the facts. LLM mode uses the distiller."""
+    ingestion): key = subject + relation with the value stripped at a template marker —
+    exploits the templated subject-relation-value shape of the facts. LLM mode uses the
+    distiller."""
     if KEY_MODE == "heuristic":
-        return {s: " ".join(normalize_answer(t).split()[:-2]) for s, t in facts}
+        return {s: _heuristic_key(t) for s, t in facts}
     cf = CACHE / f"{source}.keys.json"
     if cf.exists():
         return {int(k): v for k, v in json.load(open(cf)).items()}

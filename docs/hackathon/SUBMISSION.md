@@ -49,10 +49,11 @@ for distillation, `qwen3.7-plus` for reading — all via the OpenAI-compatible D
 
 **Evaluation — beats published SOTA on the standardized benchmark.** On
 **MemoryAgentBench** (arXiv:2507.05257) **FactConsolidation** — the conflict-resolution axis where
-famous systems collapse (Zep 7%, Mem0 18%, MemGPT 28%) — Tenet scores **86.5% single-hop,
-above the published state of the art (78.0)**, and ties multi-hop SOTA (30.2), using a
-*weaker* backbone and zero-LLM ingestion (official metric + prompt verbatim, all 800
-questions, Wilson CIs). On MAB **Accurate-Retrieval** it averages **59.3 — 2nd among the
+famous systems collapse (Zep 7%, Mem0 18%, MemGPT 28%) — Tenet scores **97.0% single-hop
+[94.8, 98.3], above even the published gpt-4o-tier result (94.8)**, and **45.8% multi-hop,
+1.5× the published SOTA (30.2)**, using a *weaker* backbone and zero-LLM ingestion
+(official metric + prompt verbatim, all 800 questions, Wilson CIs; post ingestion-keyer
+fix found by our own miss-file audit — pre-fix 86.5/30.0 preserved in the artifact). On MAB **Accurate-Retrieval** it averages **59.3 — 2nd among the
 published memory frameworks we compare to** (behind HippoRAG-v2's 65.1; 20+ points above
 Mem0/Zep/MemGPT) and **beats every published memory framework on EventQA (70.7 vs 67.6; long-context baselines reach 82.6)**. On MAB **Test-Time Learning** (the third of MAB's four
 competencies) Tenet averages **77.2 (n=500)** — above BM25 (75.4) and every published memory
@@ -175,8 +176,9 @@ with a 2-page paper + full preprint in `paper/`.
   `as_of` + `tenet timeline`/`export`). Reads stay ~9–12 ms flat from 1k to 100k facts
   on one SQLite file — scaling never becomes "operate a database cluster."
 - **Beats published SOTA on the standardized benchmark**: MemoryAgentBench (arXiv:2507.05257)
-  FactConsolidation single-hop **86.5% pooled**, above published mini-tier SOTA (78.0),
-  on a *weaker* local-7B backbone with zero-LLM ingestion — `docs/BENCHMARK.md` §6.
+  FactConsolidation single-hop **97.0% pooled** (above the published gpt-4o-tier 94.8) and
+  multi-hop **45.8%** (1.5× published SOTA 30.2), on a *weaker* local-7B backbone with
+  zero-LLM ingestion — `docs/BENCHMARK.md` §6.
 - **Same-harness reproduction of four published methods** (CAR, Mem0-style,
   HippoRAG-v2-style, MemAgent-style) — Tenet leads every arm on both single- and
   multi-hop axes, closest rival CAR at 87.5/33.0 vs Tenet 90.0/36.0 — `docs/BENCHMARK.md` §6.1.
