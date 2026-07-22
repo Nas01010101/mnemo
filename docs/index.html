@@ -406,7 +406,7 @@ footer .fcol a { display:block; }
   <div class="kicker">The signature element</div>
   <h2>Watch the belief state, not a feed</h2>
   <div class="prose">
-    <p>This is a real Tenet belief board rendered as a graph: one entity, a dozen keyed attributes,
+    <p>This is a real Tenet belief board rendered as a graph: one entity, four keyed attributes,
     and each attribute's own supersession chain over event time. Drag the slider to move
     <code>as_of</code>. The graph re-renders exactly as <code>recall(as_of=t)</code> would: a
     <span class="cur">solid node is current</span> at that instant, a <span class="sup">struck,
@@ -415,7 +415,7 @@ footer .fcol a { display:block; }
 
   <div class="graphcard">
     <div class="gc-head">
-      <h4>Belief board &middot; the user &middot; residence, job, employer, car, and more</h4>
+      <h4>Belief board &middot; the user &middot; residence, job title, car, gym</h4>
     </div>
     <div class="legend2">
       <span class="lk"><span class="dot cur"></span>current as of the slider date</span>
@@ -431,8 +431,8 @@ footer .fcol a { display:block; }
       </div>
       <div class="gsummary" id="gsummary" aria-live="polite"></div>
     </div>
-    <p class="g-note">Beliefs use the kinds of attributes ChurnBench stresses (residence, job title,
-    employer, relationship, car, and more), rendered here on a hand-built ledger for illustration. The as-of resolution rule
+    <p class="g-note">Beliefs use the same four attributes ChurnBench stresses (residence, job title,
+    car, gym), rendered here on a small, hand-built ledger for illustration. The as-of resolution rule
     matches the real store: latest <code>valid_at &le;</code> the query date among facts already true
     at that instant, zero API calls, zero network. This is exactly what <code>recall()</code> and
     <code>navigate()</code> do server-side over thousands of facts.</p>
@@ -708,45 +708,18 @@ function dayOf(iso){ return Math.round((Date.parse(iso) - DAY0) / 86400000); }
 function fmtDay(n){ return new Date(DAY0 + n*86400000).toISOString().slice(0,10); }
 
 const ATTRS = [
-  { key:"residence", label:"residence",
+  { key:"residence", label:"residence", row:0,
     values:[ {val:"Boston", valid:dayOf("2025-01-05"), invalid:dayOf("2025-06-02")},
              {val:"Seattle", valid:dayOf("2025-06-02"), invalid:dayOf("2025-11-20")},
              {val:"Austin", valid:dayOf("2025-11-20"), invalid:null} ] },
-  { key:"job_title", label:"job title",
+  { key:"job_title", label:"job title", row:1,
     values:[ {val:"Product Analyst", valid:dayOf("2025-01-05"), invalid:dayOf("2025-08-14")},
              {val:"Senior Analyst", valid:dayOf("2025-08-14"), invalid:null} ] },
-  { key:"employer", label:"employer",
-    values:[ {val:"Northwind Labs", valid:dayOf("2025-01-05"), invalid:dayOf("2025-04-18")},
-             {val:"Acme AI", valid:dayOf("2025-04-18"), invalid:null} ] },
-  { key:"manager", label:"manager",
-    values:[ {val:"Dana Kim", valid:dayOf("2025-01-05"), invalid:dayOf("2025-04-18")},
-             {val:"Priya Rao", valid:dayOf("2025-04-18"), invalid:null} ] },
-  { key:"team", label:"team",
-    values:[ {val:"Growth", valid:dayOf("2025-01-05"), invalid:dayOf("2025-04-18")},
-             {val:"Platform", valid:dayOf("2025-04-18"), invalid:dayOf("2025-11-20")},
-             {val:"Infra", valid:dayOf("2025-11-20"), invalid:null} ] },
-  { key:"car", label:"car",
+  { key:"car", label:"car", row:2,
     values:[ {val:"Honda Civic", valid:dayOf("2025-01-05"), invalid:dayOf("2025-09-10")},
              {val:"Tesla Model 3", valid:dayOf("2025-09-10"), invalid:null} ] },
-  { key:"laptop", label:"laptop",
-    values:[ {val:"MacBook Air", valid:dayOf("2025-01-05"), invalid:dayOf("2025-07-02")},
-             {val:"MacBook Pro 16", valid:dayOf("2025-07-02"), invalid:null} ] },
-  { key:"phone", label:"phone",
-    values:[ {val:"617 area code", valid:dayOf("2025-01-05"), invalid:dayOf("2025-06-05")},
-             {val:"206 area code", valid:dayOf("2025-06-05"), invalid:null} ] },
-  { key:"relationship", label:"relationship",
-    values:[ {val:"Single", valid:dayOf("2025-01-05"), invalid:dayOf("2025-05-20")},
-             {val:"Engaged", valid:dayOf("2025-05-20"), invalid:dayOf("2025-11-20")},
-             {val:"Married", valid:dayOf("2025-11-20"), invalid:null} ] },
-  { key:"diet", label:"diet",
-    values:[ {val:"Omnivore", valid:dayOf("2025-01-05"), invalid:dayOf("2025-03-15")},
-             {val:"Pescatarian", valid:dayOf("2025-03-15"), invalid:null} ] },
-  { key:"pet", label:"pet",
-    values:[ {val:"none", valid:dayOf("2025-01-05"), invalid:dayOf("2025-06-30")},
-             {val:'Dog "Biscuit"', valid:dayOf("2025-06-30"), invalid:null} ] },
-  { key:"gym", label:"gym",
-    values:[ {val:"CrossFit Central", valid:dayOf("2025-01-05"), invalid:dayOf("2025-10-01")},
-             {val:"Orangetheory", valid:dayOf("2025-10-01"), invalid:null} ] },
+  { key:"gym", label:"gym", row:3,
+    values:[ {val:"CrossFit Central", valid:dayOf("2025-01-05"), invalid:null} ] },
 ];
 
 function stateOf(v, asOf){
@@ -798,15 +771,13 @@ function buildGraph(){
   const mobile = window.innerWidth < 640;
   let svg, laneItemsAll = [];
   if (!mobile){
-    const n = ATTRS.length;
-    const topY = 60, rowGap = 78;
-    const W = 780, H = topY + (n-1)*rowGap + 60;
+    const W = 780, H = 470;
     svg = frame(mount, W, H);
-    const hubX = 66, hubY = topY + (n-1)*rowGap/2;
+    const hubX = 66, hubY = 235;
     el("circle", { cx:hubX, cy:hubY, r:34, class:"hub-circ" }, svg);
     const hlab = el("text", { x:hubX, y:hubY+5, "text-anchor":"middle", class:"hub-label" }, svg);
     hlab.textContent = "user";
-    const rowY = ATTRS.map((_,i) => topY + i*rowGap);
+    const rowY = [72, 191, 310, 429];
     const attrX = 210, laneX0 = 268, laneX1 = 748;
     ATTRS.forEach((attr,i) => {
       const y = rowY[i];
@@ -819,16 +790,14 @@ function buildGraph(){
       laneItemsAll.push({ attr, items });
     });
   } else {
-    const n = ATTRS.length;
-    const topY = 120, rowGap = 140;
-    const W = 420, H = topY + (n-1)*rowGap + 60;
+    const W = 420, H = 900;
     svg = frame(mount, W, H);
     const hubX = 210, hubY = 40;
     el("circle", { cx:hubX, cy:hubY, r:26, class:"hub-circ" }, svg);
     const hlab = el("text", { x:hubX, y:hubY+5, "text-anchor":"middle", class:"hub-label" }, svg);
     hlab.textContent = "user";
     hlab.style.fontSize = "12px";
-    const rowY = ATTRS.map((_,i) => topY + i*rowGap);
+    const rowY = [130, 340, 550, 760];
     ATTRS.forEach((attr,i) => {
       const y = rowY[i];
       const path = el("path", { d:`M ${hubX} ${hubY+26} Q ${hubX} ${(hubY+y)/2} 40 ${y-40}`, class:"struct-edge" }, svg);

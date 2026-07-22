@@ -107,7 +107,7 @@ Qwen/OpenRouter/Ollama by env var with zero code change:
   (`scripts/distiller_lora/`). On a decontaminated held-out eval it hits 6/6 clean-churn
   supersessions, 0.0 fabrication, and 0.775 key-consistency — *beating* the cloud
   reference's own 0.707 (`docs/BENCHMARK.md` §10).
-- Ships as a real product: `pip install tenet-memory` (once published), a CLI
+- Ships as a real product: `pip install git+https://github.com/Nas01010101/tenet.git`, a CLI
   (`tenet chat/remember/recall/navigate/stats/doubts/sweep/timeline/export`), an HTTP
   API + a belief-ledger web demo (`src/tenet/static/index.html`), LangGraph `BaseStore`
   + LlamaIndex `BaseMemoryBlock` adapters, and a 2-page paper + full preprint in `paper/`.
@@ -205,8 +205,8 @@ half-life), not a full close of the gap (`docs/BENCHMARK.md` §9–9.1).
 - **Close the multi-session synthesis gap** (still 42.9 vs RAG's 57.1) with
   session-diverse retrieval — guaranteeing evidence coverage across distinct sessions
   instead of only deepening the sessions the top-*k* already surfaced.
-- **Publish to PyPI** (`tenet-memory` — currently install-from-source only) and wire the
-  README badge from placeholder to live.
+- **Distribution**: installable from GitHub today (`pip install git+https://github.com/Nas01010101/tenet.git`)
+  and via tagged GitHub Releases with attached wheels.
 - **Wider-N validation of the local LoRA distiller** — current numbers are a small,
   deterministic probe (n=26 messages / 8 churn groups), directionally strong but not yet
   a production SLA.

@@ -22,7 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 try:
     from langgraph.store.base import GetOp, ListNamespacesOp, MatchCondition, PutOp, SearchOp
 except ImportError:
-    print("langgraph not installed — skipping (pip install tenet-memory[langgraph])")
+    print("langgraph not installed — skipping (pip install 'tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git')")
     raise SystemExit(0)
 
 from tenet.integrations.langgraph import TenetStore  # noqa: E402

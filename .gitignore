@@ -48,3 +48,8 @@ paper/*.fdb_latexmk
 data/cache/
 scratchpad/
 .playwright-mcp/
+docs_scratch/*_cache/
+docs_scratch/reme_ws/
+docs/hackathon/DEVPOST_FORM.md
+docs/DEVPOST_FORM.md
+uv.lock

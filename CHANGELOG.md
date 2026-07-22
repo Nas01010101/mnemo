@@ -14,7 +14,7 @@ pre-1.0, so minor versions may include breaking changes.
   `Tenet.ingest()`: a re-`put()` of the same key retires the old value to
   history instead of clobbering it, and `search(query=...)` carries the
   learned-dynamics confidence (`p_valid`) on each hit. Optional extra:
-  `pip install tenet-memory[langgraph]`. See `examples/05_langgraph_store.py`.
+  `pip install "tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git"`. See `examples/05_langgraph_store.py`.
 - **Zero-key quickstart** (`examples/00_zero_key_demo.py`) — the full
   supersession / time-travel / doubts loop with no API key and no network,
   forcing the local embedder. The one thing that still needs a model is

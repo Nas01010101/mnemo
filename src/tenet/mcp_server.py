@@ -1,7 +1,7 @@
 """Tenet MCP server — exposes the self-managing memory core as MCP tools so any
 MCP client (Claude Desktop, IDEs, other agents) gains persistent memory.
 
-Run (stdio):   tenet-mcp   (console script, after `pip install tenet-memory[mcp]`)
+Run (stdio):   tenet-mcp   (console script, after `pip install "tenet-memory[mcp] @ git+https://github.com/Nas01010101/tenet.git"`)
                 or: python -m tenet.mcp_server
 Claude Desktop config:
     { "mcpServers": { "tenet": { "command": "tenet-mcp" } } }

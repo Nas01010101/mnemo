@@ -3,7 +3,7 @@
 The "wow in 60 seconds" script: no DASHSCOPE_API_KEY, no OpenAI key, nothing to
 sign up for. `EMBED_PROVIDER=local` is forced below (sentence-transformers,
 CPU) BEFORE tenet is imported, so this runs on a fresh clone the moment
-`pip install -e ".[local]"` (or, once published, `pip install tenet-memory[local]`)
+`pip install -e ".[local]"` (or `pip install "tenet-memory[local] @ git+https://github.com/Nas01010101/tenet.git"`)
 finishes.
 
 This intentionally bypasses `Tenet.ingest()` (which distills raw text via one

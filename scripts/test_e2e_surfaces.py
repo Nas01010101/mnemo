@@ -272,7 +272,7 @@ def surface_mcp() -> None:
 
 # ======================================================================================
 # 4. LangGraph BaseStore adapter — skip cleanly if `langgraph` isn't installed (it's an
-#    optional extra: `pip install tenet-memory[langgraph]`).
+#    optional extra: `pip install "tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git"`).
 # ======================================================================================
 def surface_langgraph() -> None:
     surface = "langgraph"

@@ -48,7 +48,7 @@ TERMS = [
     "qwen3.7-plus", "qwen3.6-flash", "text-embedding-v4", "gpt-4o", "gpt-4o-mini",
     "gpt-5.5", "Gemini-3.5-flash", "qwen2.5:7b", "tenet-distiller-1.5b-v2",
     "DASHSCOPE_API_KEY", "EMBED_PROVIDER=local", "LLM_PROVIDER=ollama",
-    "pip install tenet-memory", "recall(as_of=", "get_all", "navigate",
+    "recall(as_of=", "get_all", "navigate",
     "bench_horizon", "bench_factcon", "SubEM", "recall@10", "MIT",
     "Mem0", "Zep", "Letta", "Graphiti", "Neo4j", "FalkorDB", "LangGraph", "MCP",
 ]

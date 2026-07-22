@@ -2,7 +2,7 @@
 
 Thin terminal skin over the same Tenet() core the library, MCP server, and HTTP API
 all share. `rich` is optional (the `cli` extra) — everything degrades to plain print
-if it isn't installed, so a bare `pip install tenet-memory` still gets a working CLI.
+if it isn't installed, so a bare `pip install git+https://github.com/Nas01010101/tenet.git` still gets a working CLI.
 """
 from __future__ import annotations
 

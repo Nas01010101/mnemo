@@ -9,7 +9,7 @@ uses for conversational facts. `search(query=...)` rides Tenet's learned
 "is this still true?" confidence (`p_valid`) on each hit.
 
 Run:
-    pip install tenet-memory[langgraph]
+    pip install "tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git"
     export DASHSCOPE_API_KEY=sk-...      # or: EMBED_PROVIDER=local (offline)
     python examples/05_langgraph_store.py
 

@@ -82,7 +82,7 @@ hidden. Every number reproduces from one documented command: `docs/BENCHMARK.md`
 **What's novel.** Memory as a *self-consistent belief state* instead of a document log:
 ingestion-time bi-temporal supersession, a belief–evidence consistency rule (stale raw
 evidence of a superseded belief is retired — none of the systems we compare to documents this mechanism), surprise-gated
-writes, and an LLM-free read path — shipped as a pip package (`pip install tenet-memory`),
+writes, and an LLM-free read path — installable with pip (`pip install git+https://github.com/Nas01010101/tenet.git`),
 a polished CLI (`tenet chat/remember/recall/stats`), an MCP server, and an HTTP API,
 with a 2-page paper + full preprint in `paper/`.
 
@@ -193,7 +193,7 @@ with a 2-page paper + full preprint in `paper/`.
   haystacks): three LLM-free retrieval changes lifted gold-evidence recall from a naive
   port's ~12% to **59.7%** @48K budget, reader-gated rather than retrieval-gated —
   `paper/tenet.md` §4.7.
-- **Ships as a real product**: `pip install tenet-memory`, a polished CLI
+- **Ships as a real product**: `pip install git+https://github.com/Nas01010101/tenet.git`, a polished CLI
   (`tenet chat/remember/recall/navigate/stats/doubts/sweep`), an MCP server any client
   can plug into today, an HTTP API + belief-ledger web demo, and a 2-page paper + full
   preprint.
@@ -202,7 +202,7 @@ with a 2-page paper + full preprint in `paper/`.
   `batch`/`abatch` Op contract, so `StateGraph.compile(store=TenetStore(...))` gives any
   LangGraph agent bi-temporal supersession — a re-`put()` of the same `(namespace, key)`
   retires the old value to history instead of overwriting it — for free. Optional extra
-  `pip install tenet-memory[langgraph]`, tested end to end in
+  `pip install "tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git"`, tested end to end in
   `scripts/test_langgraph_store.py`. Same pattern for LlamaIndex: `TenetMemoryBlock`
   (`src/tenet/integrations/llamaindex.py`) implements the modern `BaseMemoryBlock`
   contract — unlike the shipped fact-list block, a changed fact supersedes instead of

@@ -7,7 +7,7 @@ are learned for next time. Tenet doesn't care which model answers, only what
 it remembers — swap call_llm() for your own OpenAI/Anthropic/etc. client.
 
 Run:
-    pip install tenet-memory openai
+    pip install git+https://github.com/Nas01010101/tenet.git openai
     export DASHSCOPE_API_KEY=sk-...   # or point call_llm() at your own provider
     python examples/02_assistant.py
 """

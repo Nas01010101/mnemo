@@ -30,7 +30,7 @@ Mapping:
                           formatted as "- <fact>" lines under a small header
   atruncate(content)  -> drop trailing (lowest-ranked) lines to fit
 
-Install: pip install tenet-memory[llamaindex]
+Install: pip install 'tenet-memory[llamaindex] @ git+https://github.com/Nas01010101/tenet.git'
 Example: examples/06_llamaindex_memory.py
 """
 from __future__ import annotations
@@ -43,7 +43,7 @@ try:
     from llama_index.core.memory import BaseMemoryBlock
 except ImportError as e:  # pragma: no cover - exercised via scripts/test_llamaindex_block.py
     raise ImportError(
-        "TenetMemoryBlock needs llama-index-core: pip install tenet-memory[llamaindex]"
+        "TenetMemoryBlock needs llama-index-core: pip install 'tenet-memory[llamaindex] @ git+https://github.com/Nas01010101/tenet.git'"
     ) from e
 
 from pydantic import Field

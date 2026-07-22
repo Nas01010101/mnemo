@@ -7,7 +7,7 @@ langchain dependency. Only `main()`, which builds a demo chain, needs
 `langchain-core`, and that import is guarded with a helpful error.
 
 Run:
-    pip install tenet-memory langchain-core   # langchain-core only for the demo loop
+    pip install git+https://github.com/Nas01010101/tenet.git langchain-core   # langchain-core only for the demo loop
     export DASHSCOPE_API_KEY=sk-...
     python examples/04_langchain_memory.py
 """

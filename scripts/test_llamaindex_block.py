@@ -24,7 +24,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 try:
     from llama_index.core.base.llms.types import ChatMessage, MessageRole
 except ImportError:
-    print("llama-index-core not installed — skipping (pip install tenet-memory[llamaindex])")
+    print("llama-index-core not installed — skipping (pip install 'tenet-memory[llamaindex] @ git+https://github.com/Nas01010101/tenet.git')")
     raise SystemExit(0)
 
 from tenet.core import Tenet  # noqa: E402

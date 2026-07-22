@@ -9,7 +9,7 @@ Shows the core Tenet loop:
      now; history is preserved, never deleted
 
 Run:
-    pip install tenet-memory
+    pip install git+https://github.com/Nas01010101/tenet.git
     export DASHSCOPE_API_KEY=sk-...      # or: LLM_PROVIDER=openrouter EMBED_PROVIDER=local
     python examples/01_quickstart.py
 

@@ -8,7 +8,7 @@ the launch command, not Python.
 
 ## 1. Launch the server
 
-The server speaks stdio MCP. After `pip install tenet-memory[mcp]` there's a
+The server speaks stdio MCP. After `pip install "tenet-memory[mcp] @ git+https://github.com/Nas01010101/tenet.git"` there's a
 console script:
 
 ```bash

@@ -25,6 +25,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "scripts"))
 
+# The Part 2 CLI tests drive the real bench over the full LongMemEval_S haystack
+# (data/lme/longmemeval_s.json). That dataset is a large external file that is not
+# committed, so it is absent in CI and on a fresh clone. Part 2 is skipped when it
+# is missing; the deterministic Part 1 tests (math, guards, cost) always run.
+_DATA = ROOT / "data" / "lme" / "longmemeval_s.json"
+
 from bench_reme_h2h import guard_not_oracle, mcnemar, CostTracker, est_cost  # noqa: E402
 from bench_factcon import wilson_ci  # noqa: E402
 
@@ -241,10 +247,14 @@ def main() -> int:
     test_cost_tracker_budget_cap()
     test_cost_tracker_is_per_arm_not_just_per_model()
     test_qa_score_never_scores_an_api_failure_as_wrong()
-    test_dry_run_end_to_end()
-    test_arm_dispatch_restricts_output_keys()
-    test_resume_skips_already_done_questions()
-    test_oracle_guard_refuses_via_project_mode_too()
+    if _DATA.exists():
+        test_dry_run_end_to_end()
+        test_arm_dispatch_restricts_output_keys()
+        test_resume_skips_already_done_questions()
+        test_oracle_guard_refuses_via_project_mode_too()
+    else:
+        print(f"  SKIP Part 2 (CLI dry-run over {_DATA.relative_to(ROOT)}): dataset not "
+              "present (large external file, not committed); Part 1 deterministic tests ran")
     if FAILS:
         print("\nFAILURES:", FAILS)
         return 1

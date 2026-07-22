@@ -17,7 +17,7 @@
 [![paper](https://img.shields.io/badge/paper-PDF-b31b1b.svg)](paper/tenet.pdf)
 [![license](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![python](https://img.shields.io/badge/python-3.10%2B-3776ab.svg?logo=python&logoColor=white)](#quickstart)
-[![PyPI](https://img.shields.io/badge/pypi-coming%20soon-yellow.svg?logo=pypi&logoColor=white)](pyproject.toml)
+[![release](https://img.shields.io/badge/release-v0.1.0-8b7cf8.svg?logo=github&logoColor=white)](https://github.com/Nas01010101/tenet/releases/latest)
 [![Qwen Cloud](https://img.shields.io/badge/built%20on-Qwen%20Cloud-6a5acd.svg)](https://qwencloud-hackathon.devpost.com)
 [![MCP](https://img.shields.io/badge/MCP-native-000000.svg)](src/tenet/mcp_server.py)
 [![stars](https://img.shields.io/github/stars/Nas01010101/tenet?style=flat&color=8b7cf8)](https://github.com/Nas01010101/tenet/stargazers)
@@ -33,7 +33,7 @@ superseded, always queryable, always human-readable.
 **English** · [简体中文](README.zh-CN.md)
 
 ```bash
-pip install tenet-memory   # not yet on PyPI; until it lands, install from source (below)
+pip install git+https://github.com/Nas01010101/tenet.git
 ```
 ```python
 from tenet import Tenet
@@ -228,7 +228,7 @@ idealized delete-arm but beats the real `mem0ai` package. Falsification and fix 
 | multi-hop bridging | fixed-depth *k*, or none | **adaptive `navigate()`**: deepens hops only while new evidence clears a relevance-gain gate, LLM-free |
 | read path | n/a | **no LLM call** |
 
-Read the 2-page paper: **[`paper/tenet.md`](paper/tenet.md)**.
+Read the paper: **[`paper/tenet.pdf`](paper/tenet.pdf)** (8 pages), or the [Markdown source](paper/tenet.md).
 
 ## Quickstart
 
@@ -278,7 +278,7 @@ LangChain adapter, LangGraph `BaseStore` adapter, LlamaIndex memory block.
 agents) · [LangChain](examples/04_langchain_memory.py) via a thin `TenetMemory` adapter ·
 [LangGraph](examples/05_langgraph_store.py) via a `BaseStore` adapter (below) ·
 [LlamaIndex](examples/06_llamaindex_memory.py) via a `BaseMemoryBlock`
-(`pip install tenet-memory[llamaindex]`; unlike the shipped fact-list block, a changed
+(`pip install "tenet-memory[llamaindex] @ git+https://github.com/Nas01010101/tenet.git"`; unlike the shipped fact-list block, a changed
 fact *supersedes* instead of contradicting) · plain HTTP (`tenet.api:app`, `POST /chat`).
 
 ### LangGraph `BaseStore` adapter
@@ -289,7 +289,7 @@ gets bi-temporal supersession for free: re-`put()`-ting a `(namespace, key)` ret
 value to history instead of overwriting it, the same mechanism `Tenet.ingest()` uses.
 
 ```bash
-pip install tenet-memory[langgraph]
+pip install "tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git"
 ```
 ```python
 from tenet.integrations.langgraph import TenetStore

@@ -33,7 +33,7 @@ Mapping:
                                     every read path here, kept for forget_sweep
                                     bookkeeping rather than a hard row delete)
 
-Install: pip install tenet-memory[langgraph]
+Install: pip install 'tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git'
 """
 from __future__ import annotations
 
@@ -58,7 +58,7 @@ try:
     )
 except ImportError as e:  # pragma: no cover - exercised via scripts/test_langgraph_store.py
     raise ImportError(
-        "TenetStore needs langgraph: pip install tenet-memory[langgraph]"
+        "TenetStore needs langgraph: pip install 'tenet-memory[langgraph] @ git+https://github.com/Nas01010101/tenet.git'"
     ) from e
 
 from .. import memory as _memory
